@@ -3,6 +3,8 @@ import { shuffle, type Rng } from './rng';
 import type { Question } from './types';
 
 export const OPTION_COUNT = 4;
+/** A match needs at least this many selected words. */
+export const MIN_SELECTED_WORDS = 10;
 
 /** Remaining word ids to ask, in order. Immutable: drawing returns a new deck. */
 export interface Deck {
