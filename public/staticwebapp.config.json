@@ -3,14 +3,113 @@
     "apiRuntime": "dotnet-isolated:10.0"
   },
   "routes": [
-    { "route": "/api/lookup", "methods": ["POST"] },
-    { "route": "/api/chat", "methods": ["POST"] },
-    { "route": "/api/usage", "methods": ["GET"] },
-    { "route": "/api/*", "statusCode": 404 }
+    {
+      "route": "/api/lookup",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "route": "/api/chat",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "route": "/api/usage",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "route": "/api/generate-deck",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "route": "/api/suggest-phrases",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "route": "/api/extract-items",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "route": "/api/generate-distractors",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "route": "/api/decks",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "allowedRoles": [
+        "authenticated"
+      ]
+    },
+    {
+      "route": "/api/decks/*",
+      "methods": [
+        "GET",
+        "PUT",
+        "DELETE"
+      ],
+      "allowedRoles": [
+        "authenticated"
+      ]
+    },
+    {
+      "route": "/api/progress/*",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "allowedRoles": [
+        "authenticated"
+      ]
+    },
+    {
+      "route": "/api/shares",
+      "methods": [
+        "POST"
+      ],
+      "allowedRoles": [
+        "authenticated"
+      ]
+    },
+    {
+      "route": "/api/shares/*",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
+      "route": "/api/*",
+      "statusCode": 404
+    }
   ],
+  "responseOverrides": {
+    "401": {
+      "statusCode": 401,
+      "rewrite": "/401.json"
+    }
+  },
   "navigationFallback": {
     "rewrite": "/index.html",
-    "exclude": ["/assets/*", "/api/*", "/*.{svg,png,ico,json,txt}"]
+    "exclude": [
+      "/assets/*",
+      "/api/*",
+      "/.auth/*",
+      "/*.{svg,png,ico,json,txt}"
+    ]
   },
   "globalHeaders": {
     "X-Content-Type-Options": "nosniff",
