@@ -46,6 +46,23 @@ public sealed class IpRateLimiter(TimeProvider time)
         }
     }
 
+    /// <summary>Daily count without consuming (for limits that only count successful requests).</summary>
+    public int UsedToday(string key)
+    {
+        var day = time.GetUtcNow().ToUnixTimeSeconds() / 86_400;
+        lock (_gate) return Get($"d|{key}", day);
+    }
+
+    /// <summary>Add one to the daily count of <paramref name="key"/>.</summary>
+    public void CountToday(string key)
+    {
+        var day = time.GetUtcNow().ToUnixTimeSeconds() / 86_400;
+        lock (_gate)
+        {
+            _counters[$"d|{key}"] = (day, Get($"d|{key}", day) + 1);
+        }
+    }
+
     private int Get(string key, long window) =>
         _counters.TryGetValue(key, out var c) && c.Window == window ? c.Count : 0;
 

@@ -27,7 +27,7 @@ for (const name of ['weak', 'medium', 'good']) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      console.error(`${name} run ${i + 1}: HTTP ${res.status} ${data.error ?? ''}`);
+      console.error(`${name} run ${i + 1}: HTTP ${res.status} after ${Math.round((Date.now() - started) / 1000)} s ${data.error ?? ''}`);
       process.exitCode = 1;
       continue;
     }

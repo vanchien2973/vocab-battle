@@ -223,8 +223,13 @@ public sealed class WritingGradeTests
         Assert.Contains("10 lượt chấm bài", blocked!.Message);
         Assert.Null(await quota.CheckAsync("bob", "1.1.1.1", default)); // other users are not affected
 
-        // Anonymous: 3 per IP per day, in memory; the signed-in quota is separate.
-        for (var i = 0; i < 3; i++) Assert.Null(await quota.CheckAsync(null, "2.2.2.2", default));
+        // Anonymous: 3 successful gradings per IP per day, in memory; failed ones (no RecordInMemory) don't count.
+        for (var i = 0; i < 5; i++) Assert.Null(await quota.CheckAsync(null, "2.2.2.2", default));
+        for (var i = 0; i < 3; i++)
+        {
+            Assert.Null(await quota.CheckAsync(null, "2.2.2.2", default));
+            quota.RecordInMemory(null, "2.2.2.2");
+        }
         Assert.Equal(429, (await quota.CheckAsync(null, "2.2.2.2", default))?.StatusCode);
         Assert.Null(await quota.CheckAsync(null, "3.3.3.3", default));
 
@@ -241,9 +246,13 @@ public sealed class WritingGradeTests
         var none = new UnavailableStore();
         var quota = new WritingQuota(Fixtures.Options() with { WritingGradePerDay = 2 }, new IpRateLimiter(time),
             new WritingStore(new DataStores(none, none, none, none), time), time);
-        Assert.Null(await quota.CheckAsync("alice", "1.1.1.1", default));
-        Assert.Null(await quota.CheckAsync("alice", "1.1.1.1", default));
+        for (var i = 0; i < 2; i++)
+        {
+            Assert.Null(await quota.CheckAsync("alice", "1.1.1.1", default));
+            quota.RecordInMemory("alice", "1.1.1.1");
+        }
         Assert.Equal(429, (await quota.CheckAsync("alice", "1.1.1.1", default))?.StatusCode);
+        Assert.Null(await quota.CheckAsync(null, "1.1.1.1", default)); // the IP's anonymous quota is separate
     }
 }
 

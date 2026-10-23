@@ -86,13 +86,20 @@ public sealed class WritingFunctions(
         {
             return Error(e.StatusCode, e.Message);
         }
+        catch (Exception e) when (e is not OperationCanceledException)
+        {
+            logger.LogError(e, "writing-grade failed");
+            return Error(500, $"Lỗi máy chủ khi chấm bài ({e.GetType().Name}). Thử lại sau.");
+        }
 
         var response = new JsonObject { ["result"] = graded.Value };
+        var counted = false;
         if (user is not null)
         {
             try
             {
                 response["saved"] = await store.SaveAsync(user.UserId, input, graded.Value, ct);
+                counted = true;
             }
             catch (StoreUnavailableException)
             {
@@ -103,6 +110,7 @@ public sealed class WritingFunctions(
                 logger.LogError(e, "Saving a graded essay failed");
             }
         }
+        if (!counted) quota.RecordInMemory(user?.UserId, Ip(req));
         return new OkObjectResult(response);
     }
 

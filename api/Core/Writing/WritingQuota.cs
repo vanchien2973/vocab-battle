@@ -5,7 +5,7 @@ namespace VocabBattle.Api.Core.Writing;
 /// <summary>
 /// Daily grading limit, separate from the other AI limits: RATE_WRITING_GRADE_PER_DAY per signed-in user
 /// (counted in Cosmos, so it survives restarts) and RATE_WRITING_GRADE_PER_DAY_ANON per IP otherwise
-/// (in memory, like the other IP limits).
+/// (in memory, like the other IP limits). Only successful gradings count.
 /// </summary>
 public sealed class WritingQuota(AiOptions options, IpRateLimiter limiter, WritingStore store, TimeProvider time)
 {
@@ -27,11 +27,18 @@ public sealed class WritingQuota(AiOptions options, IpRateLimiter limiter, Writi
         return Memory("ip:" + ip, options.WritingGradePerDayAnon);
     }
 
-    private GateResult? Memory(string key, int perDay)
-    {
-        var d = limiter.Check("wg|" + key, "writing-grade", int.MaxValue, perDay, "chấm bài");
-        return d.Allowed ? null : new GateResult(429, d.Message!, d.RetryAfterSeconds);
-    }
+    /// <summary>
+    /// Count a successful grading in memory (anonymous, or signed in without a database). Signed-in gradings
+    /// saved to Cosmos are counted by <see cref="WritingStore.SaveAsync"/>.
+    /// </summary>
+    public void RecordInMemory(string? userId, string ip) => limiter.CountToday(MemoryKey(userId, ip));
+
+    private static string MemoryKey(string? userId, string ip) => userId is not null ? "wg|u:" + userId : "wg|ip:" + ip;
+
+    private GateResult? Memory(string key, int perDay) =>
+        limiter.UsedToday("wg|" + key) < perDay
+            ? null
+            : new GateResult(429, $"Bạn đã dùng hết {perDay} lượt chấm bài hôm nay. Quay lại vào ngày mai nhé!", SecondsToMidnight());
 
     private int SecondsToMidnight()
     {
