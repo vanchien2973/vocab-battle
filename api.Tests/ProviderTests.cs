@@ -70,6 +70,21 @@ public class OpenAiProviderTests
     }
 
     [Fact]
+    public async Task Http_error_includes_short_provider_code_only()
+    {
+        var (provider, handler) = Create();
+        handler.Reply(HttpStatusCode.Forbidden, """{ "error": { "message": "Project proj_123 lacks access", "code": "model_not_found" } }""");
+        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.LookupAsync("x", CancellationToken.None));
+        Assert.Contains("HTTP 403", e.Message);
+        Assert.Contains("model_not_found", e.Message);
+        Assert.DoesNotContain("proj_123", e.Message);
+
+        handler.Reply(HttpStatusCode.Forbidden, """{ "error": { "code": "<script>alert(1)</script>" } }""");
+        var e2 = await Assert.ThrowsAsync<AiProviderException>(() => provider.LookupAsync("x", CancellationToken.None));
+        Assert.DoesNotContain("script", e2.Message);
+    }
+
+    [Fact]
     public async Task Chat_stream_yields_deltas_then_usage()
     {
         var (provider, handler) = Create();

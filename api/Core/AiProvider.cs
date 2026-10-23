@@ -38,7 +38,30 @@ public static class AiProviderFactory
     };
 
     /// <summary>Map a provider HTTP error to a message for players (never echo the provider body, it may contain request details).</summary>
-    internal static AiProviderException HttpError(string provider, int status) => status switch
+    internal static AiProviderException HttpError(string provider, int status, string? errorCode = null)
+    {
+        var e = HttpErrorCore(provider, status);
+        // Only a short identifier (e.g. "model_not_found"), never the provider's free-text message.
+        return errorCode is { Length: > 0 and <= 64 } && System.Text.RegularExpressions.Regex.IsMatch(errorCode, "^[a-z0-9_.-]+$")
+            ? new AiProviderException($"{e.Message} Mã lỗi: {errorCode}.", e.StatusCode)
+            : e;
+    }
+
+    /// <summary>Short error identifier from a provider error body: OpenAI error.code/type, Anthropic error.type.</summary>
+    internal static async Task<string?> ReadErrorCodeAsync(HttpResponseMessage res, CancellationToken ct)
+    {
+        try
+        {
+            var err = System.Text.Json.Nodes.JsonNode.Parse(await res.Content.ReadAsStringAsync(ct))?["error"];
+            return (string?)err?["code"] ?? (string?)err?["type"];
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    private static AiProviderException HttpErrorCore(string provider, int status) => status switch
     {
         401 => new($"API key của {provider} không hợp lệ (HTTP 401). Kiểm tra lại key trong Application settings.", 502),
         403 => new($"API key của {provider} không có quyền dùng model hoặc endpoint này (HTTP 403).", 502),

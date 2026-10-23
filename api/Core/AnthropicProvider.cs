@@ -107,8 +107,9 @@ public sealed class AnthropicProvider(HttpClient http, AiOptions options) : IAiP
         if (!res.IsSuccessStatusCode)
         {
             var status = (int)res.StatusCode;
+            var code = await AiProviderFactory.ReadErrorCodeAsync(res, ct);
             res.Dispose();
-            throw AiProviderFactory.HttpError(Name, status);
+            throw AiProviderFactory.HttpError(Name, status, code);
         }
         return res;
     }
