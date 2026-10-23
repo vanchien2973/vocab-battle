@@ -1,4 +1,4 @@
-// Backup the "decks" and "progress" containers to JSON before deploying a data migration.
+// Backup the "decks", "progress" and "writings" containers to JSON before deploying a data migration.
 // Usage (the connection string stays in your own terminal, never in the repo):
 //   COSMOS_CONNECTION_STRING="AccountEndpoint=...;AccountKey=...;" npm run backup:cosmos
 // Optional: COSMOS_DATABASE (default "vocabbattle"), BACKUP_DIR (default "backups").
@@ -18,7 +18,7 @@ await mkdir(dir, { recursive: true });
 
 const db = new CosmosClient(conn).database(dbName);
 let totalRu = 0;
-for (const name of ['decks', 'progress']) {
+for (const name of ['decks', 'progress', 'writings']) {
   const iterator = db.container(name).items.readAll({ maxItemCount: 100 });
   const docs = [];
   while (iterator.hasMoreResults()) {

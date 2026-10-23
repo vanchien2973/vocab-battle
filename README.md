@@ -22,6 +22,29 @@ Thẻ từ/cụm từ rơi xuống trên nền không gian; gõ đúng để b�
 - **Kết quả**: điểm, mốc, WPM, độ chính xác, combo; danh sách từ gõ sai/để lọt với nút ôn bằng flashcard và hỏi AI. FSRS: gõ đúng ngay = Good, có sai/gợi ý = Hard, để lọt = Again (thẻ theo kiểu nội dung: Nghĩa → Anh = VI→EN, Nghe = Nghe, Cloze = Cloze, Gõ lại = EN→VI). Lịch sử phiên lưu trong progress `_typing` (100 phiên gần nhất) và hiện ở trang Ôn hôm nay.
 - **Kỹ thuật**: logic thuần, có seed trong `src/typing/engine.ts`; Canvas 2D + requestAnimationFrame với fixed timestep 1/60 s, thẻ và hiệu ứng dùng pool; React chỉ vẽ HUD qua store zustand; âm thanh Web Audio (nhớ tắt/bật); tự tạm dừng khi ẩn tab (online chỉ cảnh báo); hiệu ứng giảm khi bật reduced motion.
 
+## ✍️ Luyện Writing VSTEP
+
+Viết bài có tính giờ, AI chấm theo 4 tiêu chí VSTEP, tô lỗi ngay trong bài, đưa bản viết lại tham khảo và gợi ý cụm từ hay để thêm vào bộ từ.
+
+- **Chế độ**: luyện Task 1 (thư/email, ≥ 120 từ, gợi ý 20 phút) hoặc Task 2 (bài luận, ≥ 250 từ, 40 phút), hoặc **Thi thử** (cả 2 task, chung 60 phút, chuyển qua lại tuỳ ý, hết giờ tự nộp, không dán được văn bản). Bậc mục tiêu B1 / B2 / C1 ảnh hưởng độ khó đề và văn phong bản viết lại.
+- **Đề**: AI ra đề đúng format VSTEP theo chủ đề (hoặc ngẫu nhiên) và dạng bài Task 2; hoặc tự dán đề. Không nhúng sẵn đề thi thật hay đề sách có bản quyền. 30 đề gần nhất được nhớ trên máy và gửi cho AI như danh sách "không lặp lại".
+- **Màn viết**: đề bên trái (thu gọn được), ô văn bản thuần bên phải; tắt spellcheck/autocorrect như thi thật (luyện tập có thể bật lại). Đếm từ realtime, đồng hồ cảnh báo khi còn 5 phút và 1 phút. Nháp tự lưu mỗi 5 giây vào IndexedDB (kèm deadline) và được đề nghị khôi phục khi mở lại.
+- **Chấm**: `POST /api/writing/grade` chạy song song 2 lời gọi structured output (chấm điểm + lỗi, và bản viết lại + cụm từ). Server tính lại điểm task = trung bình 4 tiêu chí (làm tròn 0.5), không tin con số tổng của AI. Bài ngắn hơn mức tối thiểu bị giới hạn điểm Hoàn thành nhiệm vụ theo tỉ lệ độ dài. Thi thử: điểm Writing = (Task 1 + Task 2 × 2) / 3. Điểm chỉ là ước lượng của AI để luyện tập.
+- **Kết quả**: biểu đồ điểm theo tiêu chí; lỗi được tô theo loại trong bài (màu + kiểu gạch chân + nhãn chữ, có bộ lọc); bấm/rê vào lỗi để xem bản sửa, giải thích và "Hỏi AI về lỗi này". Lỗi không định vị được nằm ở danh sách "lỗi chung". Có tab bản viết lại song song (tô chỗ khác biệt), tab cụm từ hay (thêm vào bộ "VSTEP Writing – <chủ đề>" để học bằng flashcard/battle/Luyện Gõ), nút "Viết lại bài này" và bảng so sánh điểm giữa các lần làm cùng đề.
+- **Lịch sử**: lọc theo task/chủ đề, biểu đồ 4 tiêu chí theo thời gian, thống kê lỗi theo loại và lỗi lặp lại (mạo từ, thì, giới từ…). Đăng nhập thì lưu trong container Cosmos `writings` (mỗi bài một document, một document `index` cho tóm tắt, tổng lỗi và quota); chưa đăng nhập thì lưu IndexedDB.
+
+**Thông số đề thi** (số từ, thời gian, trọng số, làm tròn, quy đổi bậc: dưới 4.0 chưa đạt, 4.0–5.5 B1, 6.0–8.0 B2, 8.5–10 C1) nằm duy nhất trong [`api/Shared/vstep.json`](api/Shared/vstep.json), frontend (`src/vstep/config.ts`) và API (`api/Core/Writing/VstepConfig.cs`) cùng đọc file này. **Cần đối chiếu với hướng dẫn chính thức của kỳ thi**; muốn đổi chỉ cần sửa file đó.
+
+### Độ ổn định của điểm
+
+`fixtures/vstep/` có 3 bài mẫu tự soạn (yếu / trung bình / tốt) cho cùng một đề Task 2. Chấm mỗi bài 3 lần để xem điểm dao động bao nhiêu:
+
+```bash
+BASE=https://<site>.azurestaticapps.net RUNS=3 node scripts/grade-fixtures.mjs
+```
+
+Kết quả: _chưa chạy – chạy sau khi đặt `AI_GRADING_MODEL` trên SWA._
+
 ## Loại mục, kiểu thẻ, dạng câu hỏi
 
 **Loại mục** (`type`): `word` (từ đơn), `collocation` (vd *make a decision*), `phrasal_verb` (vd *look into*), `idiom` (vd *break the ice*), `pattern` (mẫu câu, vd *It's no use + V-ing*). Mỗi mục có `text`, `meaning`, tối đa 5 ví dụ `{en, vi}`, `ipa`/`partOfSpeech`/`note` tuỳ chọn, `tags`, `relatedTo` (mục gốc) và `distractors` (đáp án nhiễu do AI sinh sẵn khi lưu cụm từ, để battle không phải gọi AI). Giới hạn: 50 bộ/tài khoản, 500 mục/bộ.
@@ -91,6 +114,12 @@ Mọi key và lựa chọn model nằm trong **Application settings** của Stat
 | `COSMOS_CONNECTION_STRING` | cho "Bộ từ của tôi" | Connection string của Cosmos DB; thiếu thì API dữ liệu trả 503, AI vẫn chạy |
 | `COSMOS_DATABASE` | không | Mặc định `vocabbattle` |
 | `RATE_DATA_PER_MINUTE` / `RATE_DATA_PER_DAY` | không | Giới hạn API dữ liệu theo tài khoản, mặc định 60 / 3000 |
+| `AI_GRADING_MODEL` | nên có | Model chấm Writing VSTEP (có thể mạnh hơn model tra từ); mặc định dùng `AI_MODEL`. Cùng provider với `AI_PROVIDER` |
+| `AI_GRADING_PRICE_INPUT_PER_MTOK` / `AI_GRADING_PRICE_OUTPUT_PER_MTOK` | nên có | Đơn giá của model chấm (mặc định lấy đơn giá chính) để log chi phí đúng |
+| `AI_GRADING_EFFORT` | không | Mức suy luận khi chấm; mặc định như `AI_EFFORT` |
+| `AI_GRADING_TEMPERATURE` | không | Chỉ gửi khi đặt. Claude và các model reasoning của OpenAI hiện **từ chối** tham số `temperature`, nên mặc định không gửi; độ ổn định đến từ rubric cố định + effort |
+| `AI_GRADING_MAX_TOKENS` | không | Mỗi lời gọi chấm (2 lời gọi song song), mặc định 6000 |
+| `RATE_WRITING_GRADE_PER_DAY` / `RATE_WRITING_GRADE_PER_DAY_ANON` | không | Số lần chấm bài mỗi ngày: theo tài khoản (đếm trong Cosmos) / theo IP khi chưa đăng nhập (đếm trong bộ nhớ). Mặc định 10 / 3 |
 
 ### Chọn model
 
@@ -115,11 +144,14 @@ Ví dụ chi phí: một lần tra từ khoảng 700 token vào + 600 token ra, 
 | `GET/POST /api/decks`, `GET/PUT/DELETE /api/decks/{id}` | Bộ từ của người đăng nhập. PUT cần `If-Match` (etag); lệch etag → 412 kèm bản hiện tại để chọn giữ bản nào. |
 | `GET/PUT /api/progress/{deckId}` | Tiến độ FSRS; PUT gửi một lô và được merge (thẻ mới hơn thắng, cộng bộ đếm ngày). |
 | `POST /api/shares` `{ deckId }`, `GET /api/shares/{code}` | Mã chia sẻ 8 ký tự (30 ngày). GET không cần đăng nhập. |
+| `POST /api/writing/generate-prompt` `{ task, level, topic, essayType, avoid }` | Đề VSTEP do AI soạn (`topic: "random"` để server chọn). |
+| `POST /api/writing/grade` `{ task, level, prompt, essay, durationSec, examId? }` | Chấm bài (≤ 600 từ). Có giới hạn số lần/ngày riêng; đăng nhập thì lưu luôn vào lịch sử và trả `saved: { id, promptId, attempt }`. |
+| `GET /api/writings`, `GET/DELETE /api/writings/{id}` | Lịch sử Writing (tóm tắt + thống kê lỗi) và từng bài, chỉ của người đăng nhập. |
 | `GET /api/usage` | Số request, token vào/ra, chi phí ước tính và **RU Cosmos** trong ngày (UTC). |
 
 Mọi endpoint AI dùng structured output và validate bằng chính schema đã gửi (`api/AiShared/*.schema.json`), retry 1 lần, tính vào rate limit. Kết quả AI luôn qua màn xem trước để chọn trước khi lưu.
 
-Endpoint dữ liệu đọc user từ header `x-ms-client-principal` do SWA đặt (không tin `userId` client gửi), mọi truy vấn chỉ trong partition của user đó. `staticwebapp.config.json` yêu cầu role `authenticated` cho `/api/decks*`, `/api/progress/*` và `POST /api/shares`.
+Endpoint dữ liệu đọc user từ header `x-ms-client-principal` do SWA đặt (không tin `userId` client gửi), mọi truy vấn chỉ trong partition của user đó. `staticwebapp.config.json` yêu cầu role `authenticated` cho `/api/decks*`, `/api/progress/*`, `/api/writings*` và `POST /api/shares`.
 
 System prompt và schema nằm trong `api/AiShared/`. Server nhúng chúng vào build, còn frontend (chế độ BYOK) import trực tiếp, nên hai bên luôn dùng chung một bản.
 
@@ -177,10 +209,10 @@ Thiết lập một lần (trên web):
 
 - Tạo account **Azure Cosmos DB for NoSQL** với **Apply Free Tier Discount** (mỗi subscription chỉ 1 account free tier: 1000 RU/s và 25 GB miễn phí).
 - Database `vocabbattle` dùng **throughput chia sẻ, Manual 1000 RU/s** (không đặt throughput riêng cho container, không autoscale), nên không bao giờ vượt phần miễn phí.
-- Container: `decks` (partition `/userId`), `progress` (`/userId`), `shares` (`/code`, bật TTL "On (no default)"; mỗi share tự đặt `ttl` 30 ngày).
+- Container: `decks` (partition `/userId`), `progress` (`/userId`), `shares` (`/code`, bật TTL "On (no default)"; mỗi share tự đặt `ttl` 30 ngày), `writings` (`/userId`).
 - Indexing policy chỉ index trường được truy vấn, loại trừ `items` / thẻ để ghi rẻ RU:
   - `decks`: include `/userId/?`, `/updatedAt/?`, `/name/?`; exclude `/*`.
-  - `progress`, `shares`: exclude `/*` (chỉ đọc theo id).
+  - `progress`, `shares`, `writings`: exclude `/*` (chỉ đọc theo id).
 - Mỗi request log RU; xem tổng trong `GET /api/usage` → `ru`.
 - Chỉ có thể dùng connection string (managed functions của SWA không hỗ trợ managed identity), đặt trong Environment variables, không commit.
 
@@ -190,7 +222,7 @@ Thiết lập một lần (trên web):
 COSMOS_CONNECTION_STRING="<connection string, chỉ dán trong terminal của bạn>" npm run backup:cosmos
 ```
 
-Script ghi `backups/<thời điểm>/decks.json` và `progress.json` (thư mục đã gitignore). Migration `words[]` → `items[]` (schemaVersion 2) chạy khi đọc và được ghi lại ở dạng mới trong lần lưu kế tiếp, ở cả API lẫn IndexedDB (Dexie version 2).
+Script ghi `backups/<thời điểm>/decks.json`, `progress.json` và `writings.json` (thư mục đã gitignore). Migration `words[]` → `items[]` (schemaVersion 2) chạy khi đọc và được ghi lại ở dạng mới trong lần lưu kế tiếp, ở cả API lẫn IndexedDB (Dexie version 2).
 
 ## Kiến trúc
 

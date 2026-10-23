@@ -28,8 +28,11 @@ function sentenceAround(text: string, start: number, end: number): string {
 
 export function askAiMessage(e: WritingError, sentence: string | null): string {
   const where = sentence ? ` trong câu: "${sentence}"` : '';
+  const category = CATEGORY_LABELS[e.category];
+  const rule = RULE_LABELS[e.rule] ?? e.rule;
+  const kind = rule.toLowerCase() === category.toLowerCase() || e.rule === 'other' ? category.toLowerCase() : `${category.toLowerCase()} – ${rule.toLowerCase()}`;
   return (
-    `Trong bài viết VSTEP của mình có đoạn "${e.quote}"${where}. AI chấm là lỗi ${CATEGORY_LABELS[e.category].toLowerCase()} (${RULE_LABELS[e.rule] ?? e.rule}) ` +
+    `Trong bài viết VSTEP của mình có đoạn "${e.quote}"${where}. AI chấm là lỗi ${kind} ` +
     `và sửa thành "${e.correction}". Giải thích kỹ hơn vì sao sai, khi nào dùng đúng, và cho 2-3 câu ví dụ đúng giúp mình.`
   );
 }
@@ -84,7 +87,7 @@ export function AnnotatedEssay({ text, errors }: { text: string; errors: Writing
         {errors.length === 0 && <p className="muted">AI không tìm thấy lỗi cụ thể nào 🎉</p>}
       </div>
 
-      <div className="essay-box" ref={box} lang="en" onMouseLeave={() => setOpen(null)}>
+      <div className="essay-box" ref={box} lang="en" onMouseLeave={() => setOpen(null)} onKeyDown={(e) => e.key === 'Escape' && setOpen(null)}>
         {segments(text, located.spans).map((seg, i) => {
           if (seg.index === null) return <span key={i}>{seg.text}</span>;
           const e = errors[seg.index];
@@ -99,7 +102,8 @@ export function AnnotatedEssay({ text, errors }: { text: string; errors: Writing
               aria-expanded={open?.index === idx}
               onMouseEnter={(ev) => show(idx, ev.currentTarget)}
               onFocus={(ev) => show(idx, ev.currentTarget)}
-              onClick={(ev) => (open?.index === idx ? setOpen(null) : show(idx, ev.currentTarget))}
+              // Touch fires mouseenter right before click, so a click always opens (never toggles).
+              onClick={(ev) => show(idx, ev.currentTarget)}
             >
               {seg.text}
               <sup aria-hidden="true">{CATEGORY_TAGS[e.category]}</sup>

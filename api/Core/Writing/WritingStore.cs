@@ -44,7 +44,11 @@ public sealed partial class WritingStore(DataStores stores, TimeProvider time)
         await UpdateIndexAsync(userId, index =>
         {
             var summaries = index["summaries"]!.AsArray();
-            attempt = summaries.Count(s => (string?)s?["promptId"] == promptId) + 1;
+            // Per-prompt counters outlive the capped summary list, so numbering stays right.
+            var attempts = index["attempts"] as JsonObject ?? [];
+            attempt = ((int?)attempts[promptId] ?? summaries.Count(s => (string?)s?["promptId"] == promptId)) + 1;
+            attempts[promptId] = attempt;
+            index["attempts"] = attempts;
             summaries.Add(Summary(id, g, promptId, attempt, result, counts, createdAt));
             while (summaries.Count > C.HistoryLimit) summaries.RemoveAt(0);
             index["stats"] = AddCounts(index["stats"] as JsonObject, counts, 1);

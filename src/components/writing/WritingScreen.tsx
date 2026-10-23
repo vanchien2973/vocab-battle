@@ -8,6 +8,7 @@ import { rememberPrompt } from '../../vstep/recentPrompts';
 import type { WritingRecord, WritingSummary } from '../../vstep/types';
 import { promptIdOf } from '../../vstep/wordCount';
 import { WritingEditor } from './WritingEditor';
+import { WritingHistory } from './WritingHistory';
 import { WritingHome, type StartSession } from './WritingHome';
 import { WritingResult } from './WritingResult';
 
@@ -15,7 +16,8 @@ type Stage =
   | { name: 'home' }
   | { name: 'write'; draft: WritingDraft }
   | { name: 'grading'; draft: WritingDraft; error?: string }
-  | { name: 'result'; session: GradedSession; history?: WritingSummary[] };
+  | { name: 'result'; session: GradedSession; history?: WritingSummary[]; fromHistory?: boolean }
+  | { name: 'history'; error?: string };
 
 export function newDraft(s: StartSession, now = Date.now()): WritingDraft {
   return {
@@ -81,6 +83,26 @@ export function WritingScreen({ onMenu }: { onMenu: () => void }) {
   const rewrite = (r: WritingRecord) =>
     start({ mode: r.task === 1 ? 'task1' : 'task2', level: r.level, prompts: [r.prompt], texts: [r.text], rewriteOf: r.id });
 
+  /** A past attempt (both tasks of a full test together). */
+  async function openPast(s: WritingSummary, all: WritingSummary[]) {
+    const group = s.examId ? all.filter((x) => x.examId === s.examId) : [s];
+    try {
+      const records = await Promise.all(group.map((x) => data.writings.get(x.id)));
+      setStage({ name: 'result', session: { records: records.sort((a, b) => a.task - b.task), exam: !!s.examId }, history: all, fromHistory: true });
+    } catch (e) {
+      setStage({ name: 'history', error: (e as Error).message });
+    }
+  }
+
+  if (stage.name === 'history') {
+    return (
+      <>
+        {stage.error && <p className="error-box">{stage.error}</p>}
+        <WritingHistory onBack={() => setStage({ name: 'home' })} onOpen={(s, all) => void openPast(s, all)} />
+      </>
+    );
+  }
+
   if (stage.name === 'write') {
     return (
       <WritingEditor
@@ -136,9 +158,19 @@ export function WritingScreen({ onMenu }: { onMenu: () => void }) {
         onRewrite={rewrite}
         actions={
           <>
+            {stage.fromHistory && (
+              <button type="button" className="btn" onClick={() => setStage({ name: 'history' })}>
+                ← Lịch sử
+              </button>
+            )}
             <button type="button" className="btn primary" onClick={() => setStage({ name: 'home' })}>
               ✍️ Viết bài mới
             </button>
+            {!stage.fromHistory && (
+              <button type="button" className="btn" onClick={() => setStage({ name: 'history' })}>
+                📈 Lịch sử
+              </button>
+            )}
             <button type="button" className="btn ghost" onClick={onMenu}>
               Menu
             </button>
@@ -151,7 +183,7 @@ export function WritingScreen({ onMenu }: { onMenu: () => void }) {
   return (
     <WritingHome
       onStart={start}
-      onHistory={() => undefined}
+      onHistory={() => setStage({ name: 'history' })}
       onMenu={onMenu}
       draftBanner={
         pending && (

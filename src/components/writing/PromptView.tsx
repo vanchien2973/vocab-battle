@@ -13,7 +13,7 @@ export function PromptView({ prompt, compact }: { prompt: WritingPrompt; compact
         {prompt.essayType && <span className="badge">{ESSAY_TYPE_LABELS[prompt.essayType] ?? prompt.essayType}</span>}
         {prompt.register && <span className="badge">{REGISTER_LABELS[prompt.register] ?? prompt.register}</span>}
       </p>
-      {!compact && <h4>{prompt.title}</h4>}
+      {!compact && prompt.source === 'ai' && <h4>{prompt.title}</h4>}
       <p className="prompt-text" lang="en">
         {prompt.text}
       </p>
