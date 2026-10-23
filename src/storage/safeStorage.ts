@@ -15,3 +15,11 @@ export function writeJSON(key: string, value: unknown): void {
     // ignore: storage is a convenience only
   }
 }
+
+export function removeKey(key: string): void {
+  try {
+    globalThis.localStorage?.removeItem(key);
+  } catch {
+    // ignore
+  }
+}

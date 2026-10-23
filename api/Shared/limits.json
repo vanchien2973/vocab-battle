@@ -1,0 +1,24 @@
+{
+  "maxDecksPerUser": 50,
+  "maxItemsPerDeck": 500,
+  "maxExamplesPerItem": 5,
+  "maxTagsPerItem": 10,
+  "maxDistractorsPerList": 6,
+  "fieldLength": {
+    "deckName": 80,
+    "deckDescription": 300,
+    "id": 64,
+    "text": 80,
+    "meaning": 200,
+    "example": 300,
+    "ipa": 60,
+    "partOfSpeech": 30,
+    "note": 300,
+    "tag": 30
+  },
+  "generateDeck": { "minCount": 10, "maxCount": 30, "maxTopicLength": 100 },
+  "extractItems": { "maxPassageLength": 2000 },
+  "shareCodeLength": 8,
+  "shareTtlSeconds": 2592000,
+  "deckLinkWarnLength": 8000
+}
