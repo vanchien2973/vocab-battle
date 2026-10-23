@@ -9,9 +9,10 @@ interface Props {
   onOnline: () => void;
   onDecks: () => void;
   onStudy: () => void;
+  onTyping: () => void;
 }
 
-export function Menu({ onOffline, onOnline, onDecks, onStudy }: Props) {
+export function Menu({ onOffline, onOnline, onDecks, onStudy, onTyping }: Props) {
   const [mode, setMode] = useState<'local' | 'bot' | null>(null);
   const [name, setName] = useState(loadName);
   const [name2, setName2] = useState('');
@@ -42,6 +43,9 @@ export function Menu({ onOffline, onOnline, onDecks, onStudy }: Props) {
           </button>
           <button type="button" className="btn big primary" onClick={onOnline}>
             🌐 Online 1v1
+          </button>
+          <button type="button" className="btn big" onClick={onTyping}>
+            ⌨️ Luyện Gõ
           </button>
           <div className="menu-row">
             <button type="button" className="btn big" onClick={onDecks}>

@@ -15,6 +15,7 @@ const DecksPage = lazy(() => import('./components/decks/DecksPage').then((m) => 
 const DeckEditor = lazy(() => import('./components/decks/DeckEditor').then((m) => ({ default: m.DeckEditor })));
 const SharedDeckView = lazy(() => import('./components/decks/SharedDeckView').then((m) => ({ default: m.SharedDeckView })));
 const StudyScreen = lazy(() => import('./components/study/StudyScreen').then((m) => ({ default: m.StudyScreen })));
+const TypingGame = lazy(() => import('./components/typing/TypingGame').then((m) => ({ default: m.TypingGame })));
 const SyncPrompt = lazy(() => import('./components/decks/DeckDialogs').then((m) => ({ default: m.SyncPrompt })));
 
 export type Screen =
@@ -24,7 +25,8 @@ export type Screen =
   | { name: 'decks' }
   | { name: 'deck'; id: string }
   | { name: 'study'; deckIds: string[] | null; back: Screen }
-  | { name: 'shared'; source: SharedSource };
+  | { name: 'shared'; source: SharedSource }
+  | { name: 'typing' };
 
 function initialScreen(): Screen {
   const room = roomFromSearch(window.location.search);
@@ -61,6 +63,9 @@ export default function App() {
     case 'study':
       content = <StudyScreen deckIds={screen.deckIds} onBack={() => setScreen(screen.back)} />;
       break;
+    case 'typing':
+      content = <TypingGame onMenu={toMenu} onOnline={() => setScreen({ name: 'online', room: null })} />;
+      break;
     case 'shared':
       content = (
         <SharedDeckView
@@ -83,6 +88,7 @@ export default function App() {
           onOnline={() => setScreen({ name: 'online', room: null })}
           onDecks={() => setScreen({ name: 'decks' })}
           onStudy={() => setScreen({ name: 'study', deckIds: null, back: { name: 'menu' } })}
+          onTyping={() => setScreen({ name: 'typing' })}
         />
       );
   }

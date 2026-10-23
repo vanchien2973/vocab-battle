@@ -17,12 +17,14 @@ interface Props {
   onNext: (items: BattleItem[], kinds: QuestionKind[]) => void;
   onBack?: () => void;
   title?: string;
+  /** Hide the battle question kinds (Luyện Gõ). */
+  hideKinds?: boolean;
 }
 
 type Row = { key: string; item: BattleItem };
 
 /** Step 1: built-in words or items from the player's decks, filters, and which question kinds to ask. */
-export function ItemPicker({ selection, onChange, onNext, onBack, title }: Props) {
+export function ItemPicker({ selection, onChange, onNext, onBack, title, hideKinds }: Props) {
   const data = useData();
   const [tab, setTab] = useState<'builtin' | 'mine'>(selection.deckIds.length ? 'mine' : 'builtin');
   const [level, setLevel] = useState<Level | 'all'>('all');
@@ -69,7 +71,7 @@ export function ItemPicker({ selection, onChange, onNext, onBack, title }: Props
   }, [tab, level, type, search, openDecks]);
 
   const min = minSelected(items);
-  const enough = items.length >= min && selection.kinds.length > 0;
+  const enough = items.length >= min && (hideKinds || selection.kinds.length > 0);
   const setKeys = (keys: string[]) => onChange({ ...selection, keys });
   const toggle = (key: string) => setKeys(selected.has(key) ? selection.keys.filter((k) => k !== key) : [...selection.keys, key]);
   const toggleDeck = (id: string) => {
@@ -166,6 +168,7 @@ export function ItemPicker({ selection, onChange, onNext, onBack, title }: Props
             <input type="number" className="input tiny" min={1} value={randomN} aria-label="Số mục ngẫu nhiên" onChange={(e) => setRandomN(Math.max(1, Number(e.target.value) || 1))} />
           </span>
         </div>
+        {!hideKinds && (
         <details className="kinds">
           <summary>
             Dạng câu hỏi ({selection.kinds.length}/{GENERATORS.length})
@@ -180,6 +183,7 @@ export function ItemPicker({ selection, onChange, onNext, onBack, title }: Props
           </div>
           <p className="muted small">Số trong ngoặc: mục đủ dữ liệu cho dạng đó. Mục không đủ dữ liệu sẽ hỏi Nghĩa hoặc Cloze.</p>
         </details>
+        )}
       </header>
 
       <ul className="word-grid">
@@ -213,7 +217,7 @@ export function ItemPicker({ selection, onChange, onNext, onBack, title }: Props
         <span className={`count ${enough ? '' : 'warn'}`}>
           Đã chọn <strong>{items.length}</strong> mục
           {items.length < min && ` · cần tối thiểu ${min}`}
-          {selection.kinds.length === 0 && ' · chọn ít nhất 1 dạng câu hỏi'}
+          {!hideKinds && selection.kinds.length === 0 && ' · chọn ít nhất 1 dạng câu hỏi'}
         </span>
         <button type="button" className="btn primary" disabled={!enough} onClick={() => onNext(items, selection.kinds)}>
           Tiếp →

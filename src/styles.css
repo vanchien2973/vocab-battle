@@ -1384,3 +1384,63 @@ a.btn { text-decoration: none; text-align: center; }
 details.kinds { margin-top: 0.5rem; }
 details.kinds summary { cursor: pointer; color: var(--muted); }
 details.kinds .chips { margin-top: 0.4rem; }
+
+/* ---------- Luyện Gõ ---------- */
+.typing-play {
+  --vvh: 100dvh;
+  position: fixed;
+  inset: 0;
+  height: var(--vvh);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  background: #0b1024;
+}
+.typing-hud {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.8rem;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--line);
+  font-size: 0.9rem;
+}
+.hud-stat strong { color: var(--accent); }
+.hud-deck { display: inline-block; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; color: var(--muted); }
+.hud-tools { margin-left: auto; display: flex; gap: 0.2rem; }
+.typing-arena { flex: 1; min-height: 0; display: flex; gap: 0.5rem; padding: 0.4rem; }
+.typing-canvas { flex: 1; min-width: 0; width: 100%; height: 100%; border-radius: 12px; touch-action: manipulation; cursor: text; }
+.typing-opponent { width: 26%; max-width: 260px; display: flex; flex-direction: column; gap: 0.3rem; }
+.typing-mini { flex: 1; width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+@media (max-width: 700px) {
+  .typing-arena.versus { flex-direction: column; }
+  .typing-opponent { width: 100%; max-width: none; height: 22%; flex-direction: row; align-items: stretch; }
+  .typing-opponent .small { width: 40%; }
+  .typing-mini { height: 100%; }
+  .typing-hud { font-size: 0.8rem; }
+}
+.typing-input {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  font-size: 16px;
+  border: 0;
+  padding: 0;
+}
+.typing-warning {
+  margin: 0;
+  padding: 0.4rem 0.8rem;
+  background: #4a2a10;
+  color: var(--accent);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.typing-paused { display: flex; flex-direction: column; gap: 0.6rem; align-items: center; }
+.stats-row.five { grid-template-columns: repeat(auto-fit, minmax(5.5rem, 1fr)); }
+.badge.miss { background: var(--bad); }
+.badge.assist { background: var(--mid); color: #2a2000; }
+.typing-setup .card h3 { margin: 0.2rem 0 0; }
