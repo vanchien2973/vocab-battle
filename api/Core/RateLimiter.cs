@@ -17,7 +17,8 @@ public sealed class IpRateLimiter(TimeProvider time)
     private readonly Dictionary<string, (long Window, int Count)> _counters = [];
     private long _lastSweepMinute;
 
-    public RateDecision Check(string ip, string endpoint, int perMinute, int perDay)
+    /// <param name="what">What the daily limit counts, for the message (e.g. "AI").</param>
+    public RateDecision Check(string ip, string endpoint, int perMinute, int perDay, string what = "AI")
     {
         var now = time.GetUtcNow();
         var minute = now.ToUnixTimeSeconds() / 60;
@@ -32,7 +33,7 @@ public sealed class IpRateLimiter(TimeProvider time)
             if (d >= perDay)
             {
                 var retry = (int)((day + 1) * 86_400 - now.ToUnixTimeSeconds());
-                return new RateDecision(false, retry, $"Bạn đã dùng hết {perDay} lượt AI hôm nay. Quay lại vào ngày mai nhé!");
+                return new RateDecision(false, retry, $"Bạn đã dùng hết {perDay} lượt {what} hôm nay. Quay lại vào ngày mai nhé!");
             }
             if (m >= perMinute)
             {

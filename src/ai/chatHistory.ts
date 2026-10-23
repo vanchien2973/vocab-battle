@@ -24,13 +24,19 @@ export function trimHistory(history: readonly ChatMsg[]): ChatMsg[] {
   return msgs;
 }
 
+const PHRASE_TYPES: readonly string[] = ['collocation', 'phrasal_verb', 'idiom', 'pattern'];
+
 /** Learner info as data for the first user turn (never the system prompt). Mirrors ChatService.ContextNote. */
 export function contextNote(level: ChatRequest['level'], words: ChatRequest['words']): string | null {
   const lv = level && CEFR_LEVELS.includes(level) ? level : null;
   const list = (words ?? [])
     .filter((w) => w.word.trim() !== '')
     .slice(0, MAX_WORDS)
-    .map((w) => (w.meaning ? `${w.word.slice(0, 40)} (${w.meaning.slice(0, 60)})` : w.word.slice(0, 40)));
+    .map((w) => {
+      let text = w.word.trim().slice(0, 80);
+      if (w.type && PHRASE_TYPES.includes(w.type)) text += ` [${w.type.replace('_', ' ')}]`;
+      return w.meaning ? `${text} (${w.meaning.slice(0, 60)})` : text;
+    });
   if (!lv && list.length === 0) return null;
   return prompts.contextTemplate.replace('{level}', lv ?? 'unknown').replace('{words}', list.length ? list.join('; ') : 'none');
 }

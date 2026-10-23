@@ -1,6 +1,7 @@
 namespace VocabBattle.Api.Core;
 
-public sealed record WordRef(string Word, string? Meaning);
+/// <summary>A word or phrase from the learner's list; Type is an item type such as "phrasal_verb".</summary>
+public sealed record WordRef(string Word, string? Meaning, string? Type = null);
 
 /// <summary>What the browser may send. There is deliberately no system prompt or model field.</summary>
 public sealed record ChatRequest(string? Mode, string? Level, List<WordRef>? Words, List<ChatMessage>? Messages);
@@ -65,12 +66,22 @@ public static class ChatService
         var list = (words ?? [])
             .Where(w => !string.IsNullOrWhiteSpace(w.Word))
             .Take(MaxWords)
-            .Select(w => string.IsNullOrWhiteSpace(w.Meaning) ? Truncate(w.Word, 40) : $"{Truncate(w.Word, 40)} ({Truncate(w.Meaning, 60)})")
+            .Select(Describe)
             .ToList();
         if (lv is null && list.Count == 0) return null;
         return AiShared.Prompts.ContextTemplate
             .Replace("{level}", lv ?? "unknown")
             .Replace("{words}", list.Count == 0 ? "none" : string.Join("; ", list));
+    }
+
+    public static readonly string[] PhraseTypes = ["collocation", "phrasal_verb", "idiom", "pattern"];
+
+    /// <summary>"look into [phrasal verb] (điều tra)"; single words have no type tag.</summary>
+    private static string Describe(WordRef w)
+    {
+        var text = Truncate(w.Word.Trim(), 80);
+        if (w.Type is { } t && PhraseTypes.Contains(t)) text += $" [{t.Replace('_', ' ')}]";
+        return string.IsNullOrWhiteSpace(w.Meaning) ? text : $"{text} ({Truncate(w.Meaning, 60)})";
     }
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];

@@ -17,6 +17,7 @@ function memoryStorage() {
 
 const entry = (word: string, overrides: Partial<LookupEntry> = {}): LookupEntry => ({
   word,
+  itemType: 'word',
   ipa: '/x/',
   cefr: 'C1',
   senses: [
@@ -143,5 +144,17 @@ describe('shared schema', () => {
     expect(normalizeWord('  Give  Up ')).toBe('give up');
     expect(normalizeWord('<b>')).toBeNull();
     expect(normalizeWord('a'.repeat(41))).toBeNull();
+  });
+});
+
+describe('phrases in AI context', () => {
+  it('tags phrase types in the context note like the server', async () => {
+    const { contextNote } = await import('./chatHistory');
+    expect(
+      contextNote('B1', [
+        { word: 'look into', meaning: 'điều tra', type: 'phrasal_verb' },
+        { word: 'run', meaning: 'chạy', type: 'word' },
+      ]),
+    ).toBe('[Context note] Learner level: B1. Word list: look into [phrasal verb] (điều tra); run (chạy).');
   });
 });

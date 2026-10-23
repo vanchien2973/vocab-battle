@@ -19,7 +19,12 @@ public sealed class AiGate(AiOptions options, IpRateLimiter limiter, UsageTracke
         {
             return new GateResult(429, "Đã hết ngân sách AI của hôm nay. Thử lại vào ngày mai nhé!", 3600);
         }
-        var perMinute = endpoint == "chat" ? options.ChatPerMinute : options.LookupPerMinute;
+        var perMinute = endpoint switch
+        {
+            "chat" => options.ChatPerMinute,
+            "lookup" => options.LookupPerMinute,
+            _ => options.GeneratePerMinute,
+        };
         var decision = limiter.Check(ip, endpoint, perMinute, options.PerIpPerDay);
         return decision.Allowed ? null : new GateResult(429, decision.Message!, decision.RetryAfterSeconds);
     }

@@ -15,6 +15,8 @@ public sealed record AiOptions
     public decimal PriceOutputPerMTok { get; init; }
     public int LookupMaxTokens { get; init; } = 1500;
     public int ChatMaxTokens { get; init; } = 800;
+    /// <summary>generate-deck and extract-items (up to 30 items with examples).</summary>
+    public int GenerateMaxTokens { get; init; } = 4000;
     /// <summary>
     /// Off by default: SWA managed functions buffer the whole response (measured 2026-10-23), so SSE brings no benefit.
     /// </summary>
@@ -22,6 +24,8 @@ public sealed record AiOptions
     public decimal? DailyBudgetUsd { get; init; }
     public int LookupPerMinute { get; init; } = 20;
     public int ChatPerMinute { get; init; } = 10;
+    /// <summary>generate-deck, suggest-phrases, extract-items, generate-distractors.</summary>
+    public int GeneratePerMinute { get; init; } = 10;
     public int PerIpPerDay { get; init; } = 300;
     public string OpenAiBaseUrl { get; init; } = "https://api.openai.com/";
     public string AnthropicBaseUrl { get; init; } = "https://api.anthropic.com/";
@@ -56,10 +60,12 @@ public sealed record AiOptions
             PriceOutputPerMTok = Dec("AI_PRICE_OUTPUT_PER_MTOK", 0),
             LookupMaxTokens = Int("AI_LOOKUP_MAX_TOKENS", d.LookupMaxTokens),
             ChatMaxTokens = Int("AI_CHAT_MAX_TOKENS", d.ChatMaxTokens),
+            GenerateMaxTokens = Int("AI_GENERATE_MAX_TOKENS", d.GenerateMaxTokens),
             ChatStreaming = string.Equals(Str("CHAT_STREAMING"), "true", StringComparison.OrdinalIgnoreCase),
             DailyBudgetUsd = Str("AI_DAILY_BUDGET_USD") is null ? null : Dec("AI_DAILY_BUDGET_USD", 0),
             LookupPerMinute = Int("RATE_LOOKUP_PER_MINUTE", d.LookupPerMinute),
             ChatPerMinute = Int("RATE_CHAT_PER_MINUTE", d.ChatPerMinute),
+            GeneratePerMinute = Int("RATE_GENERATE_PER_MINUTE", d.GeneratePerMinute),
             PerIpPerDay = Int("RATE_PER_IP_PER_DAY", d.PerIpPerDay),
         };
     }

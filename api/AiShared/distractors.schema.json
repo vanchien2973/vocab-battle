@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["results"],
+  "properties": {
+    "results": {
+      "type": "array",
+      "description": "One entry per input item, in the same order.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "wrongCollocations", "wrongParticles", "wrongSentences"],
+        "properties": {
+          "text": { "type": "string", "description": "The input item's text, copied exactly." },
+          "wrongCollocations": { "type": "array", "items": { "type": "string" }, "description": "3 plausible but wrong word combinations." },
+          "wrongParticles": { "type": "array", "items": { "type": "string" }, "description": "3 wrong particles/prepositions (phrasal verbs only, else empty)." },
+          "wrongSentences": { "type": "array", "items": { "type": "string" }, "description": "2 sentences that misuse the phrase in a typical learner way." }
+        }
+      }
+    }
+  }
+}

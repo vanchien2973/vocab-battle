@@ -1,3 +1,5 @@
+using System.Text.Json.Nodes;
+
 namespace VocabBattle.Api.Core;
 
 public sealed record AiUsage(int InputTokens, int OutputTokens)
@@ -8,8 +10,11 @@ public sealed record AiUsage(int InputTokens, int OutputTokens)
 
 public sealed record ChatMessage(string Role, string Content);
 
-/// <summary>Raw structured-output text from the provider; validated by <see cref="LookupService"/>.</summary>
-public sealed record LookupRaw(string Json, AiUsage Usage);
+/// <summary>One structured-output call: fixed server-side prompts and a JSON schema the reply must match.</summary>
+public sealed record StructuredRequest(string System, string User, string SchemaName, JsonNode Schema, int MaxTokens);
+
+/// <summary>Raw structured-output text from the provider; validated by <see cref="StructuredService"/>.</summary>
+public sealed record StructuredRaw(string Json, AiUsage Usage);
 
 public abstract record ChatEvent;
 public sealed record ChatDelta(string Text) : ChatEvent;
@@ -25,7 +30,7 @@ public interface IAiProvider
 {
     string Name { get; }
     string Model { get; }
-    Task<LookupRaw> LookupAsync(string word, CancellationToken ct);
+    Task<StructuredRaw> GenerateJsonAsync(StructuredRequest request, CancellationToken ct);
     IAsyncEnumerable<ChatEvent> StreamChatAsync(string system, IReadOnlyList<ChatMessage> messages, CancellationToken ct);
 }
 

@@ -55,24 +55,13 @@ public class LookupSchemaTests
 
 public class LookupServiceTests
 {
-    private sealed class ScriptedProvider(params string[] outputs) : IAiProvider
-    {
-        public int Calls { get; private set; }
-        public string Name => "fake";
-        public string Model => "fake-model";
-
-        public Task<LookupRaw> LookupAsync(string word, CancellationToken ct) =>
-            Task.FromResult(new LookupRaw(outputs[Calls++], new AiUsage(100, 50)));
-
-        public IAsyncEnumerable<ChatEvent> StreamChatAsync(string system, IReadOnlyList<ChatMessage> messages, CancellationToken ct) =>
-            throw new NotSupportedException();
-    }
+    private static LookupService Service(IAiProvider provider) => new(new StructuredService(provider), Options());
 
     [Fact]
     public async Task Valid_first_attempt_does_not_retry()
     {
         var provider = new ScriptedProvider(ValidEntry);
-        var result = await new LookupService(provider).LookupAsync("resilient", CancellationToken.None);
+        var result = await Service(provider).LookupAsync("resilient", CancellationToken.None);
         Assert.Equal(1, provider.Calls);
         Assert.Equal(1, result.Attempts);
     }
@@ -81,7 +70,7 @@ public class LookupServiceTests
     public async Task Invalid_output_retries_once_and_sums_usage()
     {
         var provider = new ScriptedProvider("{ not json", ValidEntry);
-        var result = await new LookupService(provider).LookupAsync("resilient", CancellationToken.None);
+        var result = await Service(provider).LookupAsync("resilient", CancellationToken.None);
         Assert.Equal(2, provider.Calls);
         Assert.Equal(new AiUsage(200, 100), result.Usage);
     }
@@ -90,7 +79,7 @@ public class LookupServiceTests
     public async Task Gives_up_after_second_invalid_output()
     {
         var provider = new ScriptedProvider("{}", "[]", ValidEntry);
-        var e = await Assert.ThrowsAsync<LookupFormatException>(() => new LookupService(provider).LookupAsync("resilient", CancellationToken.None));
+        var e = await Assert.ThrowsAsync<StructuredFormatException>(() => Service(provider).LookupAsync("resilient", CancellationToken.None));
         Assert.Equal(2, provider.Calls);
         Assert.Equal(new AiUsage(200, 100), e.Usage);
     }
@@ -99,7 +88,7 @@ public class LookupServiceTests
     public async Task Invalid_input_never_calls_provider()
     {
         var provider = new ScriptedProvider(ValidEntry);
-        await Assert.ThrowsAsync<InputException>(() => new LookupService(provider).LookupAsync("DROP TABLE;", CancellationToken.None));
+        await Assert.ThrowsAsync<InputException>(() => Service(provider).LookupAsync("DROP TABLE;", CancellationToken.None));
         Assert.Equal(0, provider.Calls);
     }
 }
@@ -272,4 +261,13 @@ public class AiOptionsTests
         env["AI_PROVIDER"] = "gemini";
         Assert.NotNull(AiOptions.From(k => env.GetValueOrDefault(k)).ConfigurationError);
     }
+}
+
+public class PhraseContextTests
+{
+    [Fact]
+    public void Context_note_tags_phrase_types() =>
+        Assert.Equal(
+            "[Context note] Learner level: B1. Word list: look into [phrasal verb] (điều tra); run (chạy).",
+            ChatService.ContextNote("B1", [new("look into", "điều tra", "phrasal_verb"), new("run", "chạy", "word")]));
 }

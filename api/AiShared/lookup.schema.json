@@ -1,22 +1,74 @@
 {
   "type": "object",
   "additionalProperties": false,
-  "required": ["word", "ipa", "cefr", "senses", "examples", "collocations", "synonyms", "antonyms", "commonMistakes"],
+  "required": [
+    "word",
+    "itemType",
+    "ipa",
+    "cefr",
+    "senses",
+    "examples",
+    "collocations",
+    "synonyms",
+    "antonyms",
+    "commonMistakes"
+  ],
   "properties": {
-    "word": { "type": "string", "description": "The headword, in its base form." },
-    "ipa": { "type": "string", "description": "American English IPA, wrapped in slashes, e.g. /rɪˈzɪliənt/." },
-    "cefr": { "type": "string", "enum": ["A1", "A2", "B1", "B2", "C1", "C2"], "description": "Estimated CEFR level." },
+    "word": {
+      "type": "string",
+      "description": "The headword or expression, in its base form (e.g. \"look into\")."
+    },
+    "itemType": {
+      "type": "string",
+      "enum": [
+        "word",
+        "collocation",
+        "phrasal_verb",
+        "idiom",
+        "pattern"
+      ],
+      "description": "word for a single word, otherwise the kind of multi-word expression."
+    },
+    "ipa": {
+      "type": "string",
+      "description": "American English IPA, wrapped in slashes, e.g. /rɪˈzɪliənt/."
+    },
+    "cefr": {
+      "type": "string",
+      "enum": [
+        "A1",
+        "A2",
+        "B1",
+        "B2",
+        "C1",
+        "C2"
+      ],
+      "description": "Estimated CEFR level."
+    },
     "senses": {
       "type": "array",
       "description": "One entry per distinct meaning, most common first.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["partOfSpeech", "meaningVi", "definitionEn"],
+        "required": [
+          "partOfSpeech",
+          "meaningVi",
+          "definitionEn"
+        ],
         "properties": {
-          "partOfSpeech": { "type": "string", "description": "noun, verb, adjective, adverb, phrasal verb, ..." },
-          "meaningVi": { "type": "string", "description": "Vietnamese meaning, short." },
-          "definitionEn": { "type": "string", "description": "Short learner-friendly English definition." }
+          "partOfSpeech": {
+            "type": "string",
+            "description": "noun, verb, adjective, adverb, phrasal verb, ..."
+          },
+          "meaningVi": {
+            "type": "string",
+            "description": "Vietnamese meaning, short."
+          },
+          "definitionEn": {
+            "type": "string",
+            "description": "Short learner-friendly English definition."
+          }
         }
       }
     },
@@ -26,27 +78,59 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["en", "vi"],
+        "required": [
+          "en",
+          "vi"
+        ],
         "properties": {
-          "en": { "type": "string" },
-          "vi": { "type": "string" }
+          "en": {
+            "type": "string"
+          },
+          "vi": {
+            "type": "string"
+          }
         }
       }
     },
-    "collocations": { "type": "array", "items": { "type": "string" } },
-    "synonyms": { "type": "array", "items": { "type": "string" } },
-    "antonyms": { "type": "array", "items": { "type": "string" } },
+    "collocations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "synonyms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "antonyms": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
     "commonMistakes": {
       "type": "array",
       "description": "Mistakes Vietnamese learners often make with this word.",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["mistake", "correction", "explanationVi"],
+        "required": [
+          "mistake",
+          "correction",
+          "explanationVi"
+        ],
         "properties": {
-          "mistake": { "type": "string" },
-          "correction": { "type": "string" },
-          "explanationVi": { "type": "string" }
+          "mistake": {
+            "type": "string"
+          },
+          "correction": {
+            "type": "string"
+          },
+          "explanationVi": {
+            "type": "string"
+          }
         }
       }
     }

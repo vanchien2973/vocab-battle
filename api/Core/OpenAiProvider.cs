@@ -12,23 +12,23 @@ public sealed class OpenAiProvider(HttpClient http, AiOptions options) : IAiProv
     public string Model => options.Model!;
     private string Effort => options.Effort ?? "none";
 
-    public async Task<LookupRaw> LookupAsync(string word, CancellationToken ct)
+    public async Task<StructuredRaw> GenerateJsonAsync(StructuredRequest request, CancellationToken ct)
     {
         var body = new JsonObject
         {
             ["model"] = Model,
-            ["instructions"] = AiShared.Prompts.LookupSystem,
-            ["input"] = new JsonArray(Message("user", AiShared.Prompts.LookupUser.Replace("{word}", word))),
-            ["max_output_tokens"] = options.LookupMaxTokens,
+            ["instructions"] = request.System,
+            ["input"] = new JsonArray(Message("user", request.User)),
+            ["max_output_tokens"] = request.MaxTokens,
             ["reasoning"] = new JsonObject { ["effort"] = Effort },
             ["text"] = new JsonObject
             {
                 ["format"] = new JsonObject
                 {
                     ["type"] = "json_schema",
-                    ["name"] = "dictionary_entry",
+                    ["name"] = request.SchemaName,
                     ["strict"] = true,
-                    ["schema"] = AiShared.LookupSchemaNode(),
+                    ["schema"] = request.Schema.DeepClone(),
                 },
             },
             ["store"] = false,
@@ -49,12 +49,12 @@ public sealed class OpenAiProvider(HttpClient http, AiOptions options) : IAiProv
                         text.Append((string?)part!["text"]);
                         break;
                     case "refusal":
-                        throw new AiProviderException("AI từ chối tra từ này.", 422);
+                        throw new AiProviderException("AI từ chối yêu cầu này.", 422);
                 }
             }
         }
-        // An "incomplete" response (e.g. max_output_tokens) yields truncated JSON; LookupService retries on invalid JSON.
-        return new LookupRaw(text.ToString(), usage);
+        // An "incomplete" response (e.g. max_output_tokens) yields truncated JSON; StructuredService retries on invalid JSON.
+        return new StructuredRaw(text.ToString(), usage);
     }
 
     public async IAsyncEnumerable<ChatEvent> StreamChatAsync(

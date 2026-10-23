@@ -4,6 +4,8 @@ export type Cefr = (typeof CEFR_LEVELS)[number];
 /** Shape of api/AiShared/lookup.schema.json. */
 export interface LookupEntry {
   word: string;
+  /** "word" for a single word, otherwise the kind of expression that was looked up. */
+  itemType: 'word' | 'collocation' | 'phrasal_verb' | 'idiom' | 'pattern';
   ipa: string;
   cefr: Cefr;
   senses: { partOfSpeech: string; meaningVi: string; definitionEn: string }[];
@@ -26,7 +28,8 @@ export interface ChatMsg {
 export interface ChatRequest {
   mode: ChatMode;
   level?: Cefr;
-  words?: { word: string; meaning?: string }[];
+  /** Words or phrases; `type` is an item type such as "phrasal_verb". */
+  words?: { word: string; meaning?: string; type?: string }[];
   messages: ChatMsg[];
 }
 

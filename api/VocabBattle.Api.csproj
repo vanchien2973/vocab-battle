@@ -13,10 +13,15 @@
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Sdk" Version="2.1.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Worker.Extensions.Http.AspNetCore" Version="2.1.1" />
     <PackageReference Include="JsonSchema.Net" Version="9.4.1" />
+    <PackageReference Include="Microsoft.Azure.Cosmos" Version="3.63.2" />
+    <PackageReference Include="FluentValidation" Version="12.1.1" />
+    <!-- Required by the Cosmos SDK at build time; documents use System.Text.Json. -->
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
   <ItemGroup>
     <!-- Shared with the frontend (BYOK mode imports the same files). -->
     <EmbeddedResource Include="AiShared\*.json" LogicalName="AiShared.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Shared\*.json" LogicalName="Shared.%(Filename)%(Extension)" />
     <None Update="host.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="local.settings.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
   </ItemGroup>

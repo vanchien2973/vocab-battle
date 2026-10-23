@@ -17,31 +17,31 @@ public sealed class AnthropicProvider(HttpClient http, AiOptions options) : IAiP
     public string Model => options.Model!;
     private string Effort => options.Effort ?? "low";
 
-    public async Task<LookupRaw> LookupAsync(string word, CancellationToken ct)
+    public async Task<StructuredRaw> GenerateJsonAsync(StructuredRequest request, CancellationToken ct)
     {
         var body = new JsonObject
         {
             ["model"] = Model,
-            ["max_tokens"] = options.LookupMaxTokens,
-            ["system"] = AiShared.Prompts.LookupSystem,
-            ["messages"] = new JsonArray(Message("user", AiShared.Prompts.LookupUser.Replace("{word}", word))),
+            ["max_tokens"] = request.MaxTokens,
+            ["system"] = request.System,
+            ["messages"] = new JsonArray(Message("user", request.User)),
             ["output_config"] = new JsonObject
             {
                 ["effort"] = Effort,
-                ["format"] = new JsonObject { ["type"] = "json_schema", ["schema"] = AiShared.LookupSchemaNode() },
+                ["format"] = new JsonObject { ["type"] = "json_schema", ["schema"] = request.Schema.DeepClone() },
             },
         };
 
         using var res = await SendAsync(body, ct);
         var doc = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
-        if ((string?)doc?["stop_reason"] == "refusal") throw new AiProviderException("AI từ chối tra từ này.", 422);
+        if ((string?)doc?["stop_reason"] == "refusal") throw new AiProviderException("AI từ chối yêu cầu này.", 422);
         // Read blocks by type: responses may start with (empty) thinking blocks.
         var text = new StringBuilder();
         foreach (var block in doc?["content"]?.AsArray() ?? [])
         {
             if ((string?)block?["type"] == "text") text.Append((string?)block!["text"]);
         }
-        return new LookupRaw(text.ToString(), ReadUsage(doc?["usage"]));
+        return new StructuredRaw(text.ToString(), ReadUsage(doc?["usage"]));
     }
 
     public async IAsyncEnumerable<ChatEvent> StreamChatAsync(

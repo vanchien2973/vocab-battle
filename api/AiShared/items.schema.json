@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "description": "Vocabulary items to learn.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "text", "meaning", "partOfSpeech", "ipa", "examples", "note"],
+        "properties": {
+          "type": { "type": "string", "enum": ["word", "collocation", "phrasal_verb", "idiom", "pattern"] },
+          "text": { "type": "string", "description": "The word or phrase in its dictionary form, e.g. \"look into\", \"make a decision\"." },
+          "meaning": { "type": "string", "description": "Short Vietnamese meaning." },
+          "partOfSpeech": { "type": "string", "description": "noun, verb, adjective, ...; empty string for phrases." },
+          "ipa": { "type": "string", "description": "IPA for single words (with slashes); empty string for phrases." },
+          "examples": {
+            "type": "array",
+            "description": "1-2 natural example sentences that contain the exact text (verbs may be inflected).",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["en", "vi"],
+              "properties": { "en": { "type": "string" }, "vi": { "type": "string" } }
+            }
+          },
+          "note": { "type": "string", "description": "Optional short usage note in Vietnamese; empty string if none." }
+        }
+      }
+    }
+  }
+}

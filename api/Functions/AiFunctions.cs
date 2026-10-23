@@ -9,7 +9,8 @@ namespace VocabBattle.Api.Functions;
 
 /// <summary>HTTP triggers only parse, gate and serialize; the logic lives in Core.</summary>
 public sealed class AiFunctions(
-    AiOptions options, AiGate gate, IAiProvider provider, LookupService lookup, UsageTracker usage, ILogger<AiFunctions> logger)
+    AiOptions options, AiGate gate, IAiProvider provider, LookupService lookup, AiTasksService tasks, UsageTracker usage,
+    ILogger<AiFunctions> logger)
 {
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
@@ -30,10 +31,66 @@ public sealed class AiFunctions(
             gate.Record("lookup", provider.Model, result.Usage);
             return new OkObjectResult(result.Entry);
         }
-        catch (LookupFormatException e)
+        catch (StructuredFormatException e)
         {
             gate.Record("lookup", provider.Model, e.Usage);
             logger.LogWarning("Lookup output invalid after retry: {Detail}", e.Detail);
+            return Error(502, e.Message);
+        }
+        catch (AiProviderException e)
+        {
+            return Error(e.StatusCode, e.Message);
+        }
+    }
+
+    [Function("generate-deck")]
+    public Task<IActionResult> GenerateDeck(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "generate-deck")] HttpRequest req, CancellationToken ct) =>
+        RunTaskAsync<GenerateDeckInput>(req, "generate-deck", tasks.GenerateDeckAsync, ct);
+
+    [Function("suggest-phrases")]
+    public Task<IActionResult> SuggestPhrases(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "suggest-phrases")] HttpRequest req, CancellationToken ct) =>
+        RunTaskAsync<SuggestPhrasesInput>(req, "suggest-phrases", tasks.SuggestPhrasesAsync, ct);
+
+    [Function("extract-items")]
+    public Task<IActionResult> ExtractItems(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "extract-items")] HttpRequest req, CancellationToken ct) =>
+        RunTaskAsync<ExtractItemsInput>(req, "extract-items", tasks.ExtractItemsAsync, ct);
+
+    [Function("generate-distractors")]
+    public Task<IActionResult> GenerateDistractors(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "generate-distractors")] HttpRequest req, CancellationToken ct) =>
+        RunTaskAsync<DistractorsInput>(req, "generate-distractors", tasks.GenerateDistractorsAsync, ct);
+
+    /// <summary>Parse, gate (rate limit + budget), run the task, count tokens; input errors never reach the provider.</summary>
+    private async Task<IActionResult> RunTaskAsync<T>(
+        HttpRequest req, string endpoint, Func<T?, CancellationToken, Task<AiTaskResult>> run, CancellationToken ct) where T : class
+    {
+        if (await ReadAsync<T>(req, ct) is not { } body) return Error(400, "Yêu cầu không hợp lệ.");
+        try
+        {
+            AiTasksService.Precheck(body);
+        }
+        catch (InputException e)
+        {
+            return Error(400, e.Message);
+        }
+        if (Gate(req, endpoint) is { } blocked) return blocked;
+        try
+        {
+            var result = await run(body, ct);
+            gate.Record(endpoint, provider.Model, result.Usage);
+            return new OkObjectResult(result.Value);
+        }
+        catch (InputException e)
+        {
+            return Error(400, e.Message);
+        }
+        catch (StructuredFormatException e)
+        {
+            gate.Record(endpoint, provider.Model, e.Usage);
+            logger.LogWarning("{Endpoint} output invalid after retry: {Detail}", endpoint, e.Detail);
             return Error(502, e.Message);
         }
         catch (AiProviderException e)

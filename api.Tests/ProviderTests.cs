@@ -27,7 +27,7 @@ public class OpenAiProviderTests
         }
         """);
 
-        var raw = await provider.LookupAsync("resilient", CancellationToken.None);
+        var raw = await provider.GenerateJsonAsync(LookupRequest("resilient"), CancellationToken.None);
 
         Assert.Equal(new AiUsage(320, 210), raw.Usage);
         Assert.Null(LookupService.Validate(raw.Json, out _));
@@ -52,7 +52,7 @@ public class OpenAiProviderTests
         handler.Reply(HttpStatusCode.OK, """
         { "output": [{ "type": "message", "content": [{ "type": "refusal", "refusal": "no" }] }], "usage": {} }
         """);
-        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.LookupAsync("x", CancellationToken.None));
+        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.GenerateJsonAsync(LookupRequest("x"), CancellationToken.None));
         Assert.Equal(422, e.StatusCode);
     }
 
@@ -64,7 +64,7 @@ public class OpenAiProviderTests
     {
         var (provider, handler) = Create();
         handler.Reply(status, """{ "error": { "message": "secret details" } }""");
-        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.LookupAsync("x", CancellationToken.None));
+        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.GenerateJsonAsync(LookupRequest("x"), CancellationToken.None));
         Assert.Equal(expected, e.StatusCode);
         Assert.DoesNotContain("secret", e.Message);
     }
@@ -74,13 +74,13 @@ public class OpenAiProviderTests
     {
         var (provider, handler) = Create();
         handler.Reply(HttpStatusCode.Forbidden, """{ "error": { "message": "Project proj_123 lacks access", "code": "model_not_found" } }""");
-        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.LookupAsync("x", CancellationToken.None));
+        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.GenerateJsonAsync(LookupRequest("x"), CancellationToken.None));
         Assert.Contains("HTTP 403", e.Message);
         Assert.Contains("model_not_found", e.Message);
         Assert.DoesNotContain("proj_123", e.Message);
 
         handler.Reply(HttpStatusCode.Forbidden, """{ "error": { "code": "<script>alert(1)</script>" } }""");
-        var e2 = await Assert.ThrowsAsync<AiProviderException>(() => provider.LookupAsync("x", CancellationToken.None));
+        var e2 = await Assert.ThrowsAsync<AiProviderException>(() => provider.GenerateJsonAsync(LookupRequest("x"), CancellationToken.None));
         Assert.DoesNotContain("script", e2.Message);
     }
 
@@ -145,7 +145,7 @@ public class AnthropicProviderTests
         }
         """);
 
-        var raw = await provider.LookupAsync("resilient", CancellationToken.None);
+        var raw = await provider.GenerateJsonAsync(LookupRequest("resilient"), CancellationToken.None);
 
         Assert.Equal(new AiUsage(400, 300), raw.Usage);
         Assert.Null(LookupService.Validate(raw.Json, out _));
@@ -168,7 +168,7 @@ public class AnthropicProviderTests
     {
         var (provider, handler) = Create();
         handler.Reply(HttpStatusCode.OK, """{ "stop_reason": "refusal", "content": [], "usage": {} }""");
-        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.LookupAsync("x", CancellationToken.None));
+        var e = await Assert.ThrowsAsync<AiProviderException>(() => provider.GenerateJsonAsync(LookupRequest("x"), CancellationToken.None));
         Assert.Equal(422, e.StatusCode);
     }
 
