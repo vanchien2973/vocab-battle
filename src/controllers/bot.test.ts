@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALL_WORDS } from '../data/words';
+import { BUILTIN_ITEMS as ALL_WORDS } from '../data/words';
 import { Match } from '../game/match';
 import { mulberry32 } from '../game/rng';
 import type { Question } from '../game/types';
 import { BOT_ACCURACY, createBotController, decideBotAnswer, type BotLevel } from './bot';
 
-const q: Question = { id: 'q1', wordId: 'w', word: 'w', options: ['a', 'b', 'c', 'd'], correctIndex: 2 };
+const q: Question = { id: 'q1', itemId: 'w', kind: 'meaning', prompt: 'w', instruction: '', options: ['a', 'b', 'c', 'd'], correctIndex: 2, explanation: '' };
 
 describe('decideBotAnswer', () => {
   it('waits between 2 and 5 seconds', () => {

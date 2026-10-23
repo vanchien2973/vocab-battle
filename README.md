@@ -3,10 +3,35 @@
 Game đấu từ vựng Anh–Việt: mỗi lượt có 1 từ tiếng Anh và 4 nghĩa tiếng Việt. Ai trả lời đúng **và nhanh hơn** sẽ gây sát thương cho đối thủ; trả lời đúng liên tiếp tạo combo, sát thương tăng dần. Mỗi bên có 100 HP.
 
 - 3 chế độ: **2 người trên 1 máy** (chia đôi màn hình), **đấu với Bot** (Dễ/Thường/Khó), **Online 1v1** (WebRTC qua PeerJS).
-- Màn **Chuẩn bị** trước trận: chọn bộ từ (tối thiểu 10), xem trước bằng flashcard. Kết quả liệt kê từ trả lời sai để ôn lại.
+- Màn **Chuẩn bị** trước trận: chọn từ **Bộ có sẵn** hoặc **Bộ của tôi** (nhiều bộ, lọc theo loại), chọn **dạng câu hỏi**, xem trước bằng flashcard. Kết quả liệt kê từ/cụm từ trả lời sai và cập nhật lịch ôn.
+- **Bộ từ của tôi**: từ đơn và cụm từ (collocation, phrasal verb, idiom, mẫu câu), đăng nhập GitHub/Microsoft để lưu lên Cosmos DB (chưa đăng nhập thì lưu IndexedDB trên máy), nhập/xuất/chia sẻ, tạo bộ bằng AI.
+- **Ôn tập ngắt quãng FSRS**: flashcard EN→VI, VI→EN, Cloze, Nghe; trang **Ôn hôm nay** và thống kê.
 - **AI hỗ trợ học:** từ điển AI (IPA, nghĩa theo từng nghĩa, CEFR, ví dụ có dịch, collocations, đồng/trái nghĩa, lỗi người Việt hay mắc) và **gia sư chat** (Free talk / Sửa lỗi / Giải thích / Luyện từ đã chọn).
 
 Hosting: **Azure Static Web Apps (gói Free)**. Frontend Vite + React + TypeScript, API là **Azure Functions .NET 10 isolated** (managed functions) trong `api/`, gọi qua đường dẫn tương đối `/api/...` (cùng origin, không cần CORS).
+
+## Loại mục, kiểu thẻ, dạng câu hỏi
+
+**Loại mục** (`type`): `word` (từ đơn), `collocation` (vd *make a decision*), `phrasal_verb` (vd *look into*), `idiom` (vd *break the ice*), `pattern` (mẫu câu, vd *It's no use + V-ing*). Mỗi mục có `text`, `meaning`, tối đa 5 ví dụ `{en, vi}`, `ipa`/`partOfSpeech`/`note` tuỳ chọn, `tags`, `relatedTo` (mục gốc) và `distractors` (đáp án nhiễu do AI sinh sẵn khi lưu cụm từ, để battle không phải gọi AI). Giới hạn: 50 bộ/tài khoản, 500 mục/bộ.
+
+**Kiểu thẻ** (học): EN → VI · VI → EN (tự nhớ hoặc gõ đáp án) · Cloze (che cụm từ trong câu ví dụ, chỉ tạo khi ví dụ chứa cụm từ, kể cả dạng chia *looked into*) · Nghe (Web Speech API đọc, đoán từ). Mỗi phiên chọn một kiểu hoặc **Trộn**.
+
+**Phím tắt**: `Space` lật thẻ · `1`–`4` = Again / Hard / Good / Easy · Enter để kiểm tra khi gõ đáp án. Điện thoại: chạm để lật, vuốt trái = Again, vuốt phải = Good. Hiệu ứng lật tắt khi bật *reduced motion*. Battle: người dưới `1`–`4`, người trên `7`–`0`.
+
+**FSRS tóm tắt**: mỗi thẻ (itemId + kiểu thẻ) có độ ổn định (stability) và độ khó (difficulty). Mỗi lần chấm, [ts-fsrs](https://github.com/open-spaced-repetition/ts-fsrs) tính ngày ôn tiếp theo sao cho xác suất còn nhớ khoảng 90%: Again đưa thẻ về ôn sau vài phút, Good/Easy giãn khoảng cách ngày càng xa. "Ôn hôm nay" gom thẻ đến hạn của mọi bộ (quá hạn lâu và hay quên được ưu tiên), cộng thẻ mới, theo giới hạn mỗi ngày trong ⚙️ Cài đặt (mặc định 20 thẻ mới, 200 lượt ôn). Tiến độ ghi theo lô (mỗi 10 thẻ và cuối phiên); mất mạng thì xếp hàng trong IndexedDB rồi gửi lại. Kết quả battle cũng cập nhật thẻ EN→VI: sai = Again, đúng = Good.
+
+**Dạng câu hỏi battle** (cùng luật HP/damage/combo, mỗi dạng là một `QuestionGenerator` trong `src/game/generators.ts`):
+
+| Dạng | Ví dụ | Cần |
+| --- | --- | --- |
+| Nghĩa | *break the ice* → chọn nghĩa | mọi mục |
+| Điền chỗ trống | *The police ___ the case.* → looked into | ví dụ chứa cụm từ |
+| Ghép collocation | *___ a decision* → make / do / take / have | collocation có ≥ 3 cụm sai do AI sinh |
+| Tiểu từ phrasal verb | *look ___ the problem* → into / at / after / up | phrasal verb |
+| Tìm câu dùng sai | 4 câu, chọn câu sai (*I did a decision*) | có câu sai do AI sinh |
+| Idiom theo tình huống | tình huống tiếng Việt → chọn idiom | idiom có ví dụ dịch |
+
+Mục không đủ dữ liệu cho dạng được chọn sẽ hỏi Nghĩa hoặc Cloze. Đáp án nhiễu ưu tiên mục cùng loại; bộ nhỏ (dưới 4 mục) lấy thêm từ `words.json`. Sau mỗi câu có giải thích ngắn (bấm **Bỏ qua** để đi tiếp). Chọn toàn mục từ bộ của mình thì không cần đủ 10 mục.
 
 ## Chạy local
 
@@ -25,6 +50,14 @@ cp api/local.settings.sample.json api/local.settings.json   # rồi điền OPEN
 npx @azure/static-web-apps-cli start http://localhost:5173 --run "npm run dev" --api-location api
 ```
 
+Chạy kèm **Cosmos DB Emulator** ([cài đặt](https://learn.microsoft.com/azure/cosmos-db/emulator)): tạo database `vocabbattle` và 3 container như phần Deploy, rồi đặt `COSMOS_CONNECTION_STRING` (connection string của emulator) trong `api/local.settings.json`. SWA CLI giả lập đăng nhập tại `/.auth/login/github`. Integration test chạy khi có biến môi trường:
+
+```bash
+COSMOS_EMULATOR_CONNECTION_STRING="AccountEndpoint=https://localhost:8081/;AccountKey=<key emulator>" dotnet test --project api.Tests
+```
+
+(Không có biến này, test đó tự skip, ví dụ trên CI.)
+
 Không có API local? Mở ⚙️ **Cài đặt** và nhập API key riêng (BYOK): app sẽ gọi thẳng OpenAI/Anthropic từ trình duyệt.
 
 ## Cấu hình AI (Application settings của SWA)
@@ -41,7 +74,11 @@ Mọi key và lựa chọn model nằm trong **Application settings** của Stat
 | `AI_LOOKUP_MAX_TOKENS` / `AI_CHAT_MAX_TOKENS` | không | Mặc định 1500 / 800 |
 | `AI_EFFORT` | không | Mức suy luận; mặc định `none` (OpenAI), `low` (Anthropic) |
 | `CHAT_STREAMING` | không | Mặc định trả lời chat một lần (JSON); `true` để stream SSE (xem bên dưới) |
-| `RATE_LOOKUP_PER_MINUTE` / `RATE_CHAT_PER_MINUTE` / `RATE_PER_IP_PER_DAY` | không | Mặc định 20 / 10 / 300 |
+| `RATE_LOOKUP_PER_MINUTE` / `RATE_CHAT_PER_MINUTE` / `RATE_GENERATE_PER_MINUTE` / `RATE_PER_IP_PER_DAY` | không | Mặc định 20 / 10 / 10 / 300 |
+| `AI_GENERATE_MAX_TOKENS` | không | Tạo bộ / trích từ đoạn văn, mặc định 4000 |
+| `COSMOS_CONNECTION_STRING` | cho "Bộ từ của tôi" | Connection string của Cosmos DB; thiếu thì API dữ liệu trả 503, AI vẫn chạy |
+| `COSMOS_DATABASE` | không | Mặc định `vocabbattle` |
+| `RATE_DATA_PER_MINUTE` / `RATE_DATA_PER_DAY` | không | Giới hạn API dữ liệu theo tài khoản, mặc định 60 / 3000 |
 
 ### Chọn model
 
@@ -59,7 +96,18 @@ Ví dụ chi phí: một lần tra từ khoảng 700 token vào + 600 token ra, 
 | --- | --- |
 | `POST /api/lookup` `{ "word": "resilient" }` | Tra từ. Dùng structured output (JSON schema) của provider, validate lại bằng **cùng schema** (`api/AiShared/lookup.schema.json`); lỗi parse/validate thì retry 1 lần. |
 | `POST /api/chat` `{ mode, level?, words?, messages }` | Chat có streaming (SSE `data: {"delta": …}`). System prompt do server chọn theo `mode`; client không gửi được system prompt hay model. |
-| `GET /api/usage` | Số request, token vào/ra và chi phí ước tính trong ngày (UTC), chia theo endpoint. |
+| `POST /api/generate-deck` `{ topic, level, count }` | Tạo bộ 10–30 mục theo chủ đề. |
+| `POST /api/suggest-phrases` `{ word }` | 5–10 collocation / phrasal verb / idiom chứa từ. |
+| `POST /api/extract-items` `{ passage, level }` | Từ & cụm từ đáng học trong đoạn văn (≤ 2000 ký tự). |
+| `POST /api/generate-distractors` `{ items: [{type, text, meaning}] }` | Đáp án nhiễu cho battle, tối đa 10 mục/lần. |
+| `GET/POST /api/decks`, `GET/PUT/DELETE /api/decks/{id}` | Bộ từ của người đăng nhập. PUT cần `If-Match` (etag); lệch etag → 412 kèm bản hiện tại để chọn giữ bản nào. |
+| `GET/PUT /api/progress/{deckId}` | Tiến độ FSRS; PUT gửi một lô và được merge (thẻ mới hơn thắng, cộng bộ đếm ngày). |
+| `POST /api/shares` `{ deckId }`, `GET /api/shares/{code}` | Mã chia sẻ 8 ký tự (30 ngày). GET không cần đăng nhập. |
+| `GET /api/usage` | Số request, token vào/ra, chi phí ước tính và **RU Cosmos** trong ngày (UTC). |
+
+Mọi endpoint AI dùng structured output và validate bằng chính schema đã gửi (`api/AiShared/*.schema.json`), retry 1 lần, tính vào rate limit. Kết quả AI luôn qua màn xem trước để chọn trước khi lưu.
+
+Endpoint dữ liệu đọc user từ header `x-ms-client-principal` do SWA đặt (không tin `userId` client gửi), mọi truy vấn chỉ trong partition của user đó. `staticwebapp.config.json` yêu cầu role `authenticated` cho `/api/decks*`, `/api/progress/*` và `POST /api/shares`.
 
 System prompt và schema nằm trong `api/AiShared/`. Server nhúng chúng vào build, còn frontend (chế độ BYOK) import trực tiếp, nên hai bên luôn dùng chung một bản.
 
@@ -88,13 +136,15 @@ Sửa `src/data/words.json`, mỗi từ có dạng:
 { "id": "harvest", "word": "harvest", "meaning": "thu hoạch", "example": "Farmers harvest rice in autumn.", "level": "B1" }
 ```
 
-`id` và `meaning` phải là duy nhất (test `src/data/words.test.ts` sẽ kiểm tra). `level` là một trong `A1`, `A2`, `B1`, `B2`. Ngoài ra, người chơi có thể tự thêm từ qua từ điển AI (bộ "Của tôi").
+`id` và `meaning` phải là duy nhất (test `src/data/words.test.ts` sẽ kiểm tra). `level` là một trong `A1`, `A2`, `B1`, `B2`. Người chơi tự thêm từ/cụm từ trong **Bộ từ của tôi** (danh sách "Của tôi" cũ được chuyển thành bộ tên "Của tôi").
+
+Nhập: dán dòng `word - nghĩa` hoặc CSV `word,meaning,example`; xuất JSON/CSV. Chia sẻ: đã đăng nhập thì link ngắn `?share=CODE`; chưa đăng nhập thì cả bộ được nén (lz-string) vào `?deck=…` (cảnh báo khi quá 8000 ký tự).
 
 ## Chơi online
 
 1. Người A chọn **Online 1v1 → Tạo phòng**, rồi gửi mã 6 ký tự hoặc bấm **Copy link mời** (`…/?room=ABC123`).
 2. Người B mở link hoặc nhập mã rồi bấm **Vào phòng**.
-3. Chủ phòng chọn bộ từ (gửi kèm nội dung từ, nên từ "Của tôi" của chủ phòng cũng dùng được). Hai bên xem trước rồi bấm **Sẵn sàng**, sau đó đếm ngược 3-2-1 và vào trận.
+3. Chủ phòng chọn bộ từ và dạng câu hỏi (gửi kèm toàn bộ nội dung mục, có giới hạn kích thước, nên bộ của chủ phòng dùng được ngay). Sau trận, khách có nút **Lưu bộ này**. Hai bên xem trước rồi bấm **Sẵn sàng**, sau đó đếm ngược 3-2-1 và vào trận.
 
 Nếu không kết nối được sau 15 giây, hãy thử mạng khác (ví dụ 4G), vì một số mạng chặn WebRTC.
 
@@ -111,9 +161,30 @@ Thiết lập một lần (trên web):
 2. **Overview → Manage deployment token**, copy token rồi thêm vào **GitHub → Settings → Secrets and variables → Actions** với tên `AZURE_STATIC_WEB_APPS_API_TOKEN`.
 3. **Settings → Environment variables** (tab Production): thêm `AI_PROVIDER`, `AI_MODEL`, `OPENAI_API_KEY`, `AI_PRICE_INPUT_PER_MTOK`, `AI_PRICE_OUTPUT_PER_MTOK` (xem bảng ở trên) rồi bấm **Apply**.
 
+### Cosmos DB (Bộ từ của tôi) – giữ trong gói miễn phí
+
+- Tạo account **Azure Cosmos DB for NoSQL** với **Apply Free Tier Discount** (mỗi subscription chỉ 1 account free tier: 1000 RU/s và 25 GB miễn phí).
+- Database `vocabbattle` dùng **throughput chia sẻ, Manual 1000 RU/s** (không đặt throughput riêng cho container, không autoscale), nên không bao giờ vượt phần miễn phí.
+- Container: `decks` (partition `/userId`), `progress` (`/userId`), `shares` (`/code`, bật TTL "On (no default)"; mỗi share tự đặt `ttl` 30 ngày).
+- Indexing policy chỉ index trường được truy vấn, loại trừ `items` / thẻ để ghi rẻ RU:
+  - `decks`: include `/userId/?`, `/updatedAt/?`, `/name/?`; exclude `/*`.
+  - `progress`, `shares`: exclude `/*` (chỉ đọc theo id).
+- Mỗi request log RU; xem tổng trong `GET /api/usage` → `ru`.
+- Chỉ có thể dùng connection string (managed functions của SWA không hỗ trợ managed identity), đặt trong Environment variables, không commit.
+
+### Trước khi deploy thay đổi dữ liệu: backup
+
+```bash
+COSMOS_CONNECTION_STRING="<connection string, chỉ dán trong terminal của bạn>" npm run backup:cosmos
+```
+
+Script ghi `backups/<thời điểm>/decks.json` và `progress.json` (thư mục đã gitignore). Migration `words[]` → `items[]` (schemaVersion 2) chạy khi đọc và được ghi lại ở dạng mới trong lần lưu kế tiếp, ở cả API lẫn IndexedDB (Dexie version 2).
+
 ## Kiến trúc
 
 - `src/game/`: game logic thuần (damage, combo, chọn câu hỏi, engine) và `Match`, dùng chung cho cả 3 chế độ. `src/controllers/`: Bot.
 - `src/net/`: `protocol.ts`, `GameTransport` (interface), `peerTransport.ts` (PeerJS), `host.ts` (authoritative), `guest.ts`.
 - `src/ai/`: `AiClient` + 2 implementation, cắt lịch sử chat, cache tra từ, bộ "Của tôi". `src/components/ai/`: header, từ điển, chat, cài đặt.
+- `src/decks/`: model `Item`/`Deck`, migration, `DeckRepository` (`CloudDeckRepository` / `LocalDeckRepository` Dexie), đồng bộ local → cloud, import/export/chia sẻ. `src/study/`: FSRS, cloze, hàng đợi ôn, ghi tiến độ theo lô.
+- `api/Core/Data/`: `ClientPrincipal`, `IDocumentStore` (Cosmos / in-memory trong test), `DeckService`, `ProgressService`, `ShareService`, FluentValidation.
 - `api/Core/`: logic thuần, test được (`IAiProvider` với `OpenAiProvider`/`AnthropicProvider`, `LookupService`, `ChatService`, rate limit, usage). `api/Functions/` chỉ gồm các HTTP trigger mỏng. `api.Tests/`: xUnit với HttpClient được mock.
