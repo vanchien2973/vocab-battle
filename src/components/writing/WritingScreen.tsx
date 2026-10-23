@@ -1,13 +1,20 @@
 import { useEffect, useState } from 'react';
+import { getAiClient } from '../../ai';
 import { useData } from '../../decks/DataContext';
+import { gradeDraft, type GradedSession } from '../../vstep/grading';
 import { MODE_LABELS, modeMinutes } from '../../vstep/config';
 import { hasContent, type WritingDraft } from '../../vstep/drafts';
 import { rememberPrompt } from '../../vstep/recentPrompts';
 import { promptIdOf } from '../../vstep/wordCount';
 import { WritingEditor } from './WritingEditor';
 import { WritingHome, type StartSession } from './WritingHome';
+import { WritingResult } from './WritingResult';
 
-type Stage = { name: 'home' } | { name: 'write'; draft: WritingDraft } | { name: 'submitted'; draft: WritingDraft };
+type Stage =
+  | { name: 'home' }
+  | { name: 'write'; draft: WritingDraft }
+  | { name: 'grading'; draft: WritingDraft; error?: string }
+  | { name: 'result'; session: GradedSession };
 
 export function newDraft(s: StartSession, now = Date.now()): WritingDraft {
   return {
@@ -47,12 +54,24 @@ export function WritingScreen({ onMenu }: { onMenu: () => void }) {
     setStage({ name: 'write', draft });
   };
 
+  async function grade(draft: WritingDraft) {
+    setStage({ name: 'grading', draft });
+    try {
+      const session = await gradeDraft(draft, getAiClient(), data.writings);
+      await data.drafts.clear();
+      setPending(null);
+      setStage({ name: 'result', session });
+    } catch (e) {
+      setStage({ name: 'grading', draft, error: (e as Error).message });
+    }
+  }
+
   if (stage.name === 'write') {
     return (
       <WritingEditor
         key={stage.draft.startedAt}
         draft={stage.draft}
-        onSubmit={(draft) => setStage({ name: 'submitted', draft })}
+        onSubmit={(draft) => void grade(draft)}
         onQuit={() => {
           void data.drafts.load().then((d) => hasContent(d) && setPending(d));
           setStage({ name: 'home' });
@@ -61,14 +80,54 @@ export function WritingScreen({ onMenu }: { onMenu: () => void }) {
     );
   }
 
-  if (stage.name === 'submitted') {
+  if (stage.name === 'grading') {
+    const { draft, error } = stage;
+    // An expired exam would submit again at once: give two minutes to fix it (e.g. an essay that is too long).
+    const reopen = () => setStage({ name: 'write', draft: draft.mode === 'exam' && draft.deadline <= Date.now() ? { ...draft, deadline: Date.now() + 120_000 } : draft });
     return (
-      <div className="writing-home">
-        <h1>✅ Đã nộp bài</h1>
-        <button type="button" className="btn" onClick={() => setStage({ name: 'home' })}>
-          ← Quay lại
-        </button>
+      <div className="writing-home grading" aria-busy={!error}>
+        {error ? (
+          <>
+            <h1>⚠️ Chưa chấm được bài</h1>
+            <p className="error-box">{error}</p>
+            <p className="muted small">Bài viết vẫn được lưu nháp trên máy này.</p>
+            <div className="actions-row">
+              <button type="button" className="btn primary" onClick={() => void grade(draft)}>
+                🔁 Chấm lại
+              </button>
+              <button type="button" className="btn" onClick={reopen}>
+                ✏️ Quay lại sửa bài
+              </button>
+              <button type="button" className="btn ghost" onClick={() => setStage({ name: 'home' })}>
+                Về trang Writing
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h1>⏳ AI đang chấm bài…</h1>
+            <p className="muted">Chấm theo 4 tiêu chí VSTEP, tìm lỗi và viết lại bài tham khảo – thường mất 20–40 giây.</p>
+          </>
+        )}
       </div>
+    );
+  }
+
+  if (stage.name === 'result') {
+    return (
+      <WritingResult
+        session={stage.session}
+        actions={
+          <>
+            <button type="button" className="btn primary" onClick={() => setStage({ name: 'home' })}>
+              ✍️ Viết bài mới
+            </button>
+            <button type="button" className="btn ghost" onClick={onMenu}>
+              Menu
+            </button>
+          </>
+        }
+      />
     );
   }
 
