@@ -7,6 +7,7 @@ import { CONTENT_KINDS, CONTENT_LABELS, type ContentKind } from '../../typing/ty
 import { ItemPicker } from '../prepare/ItemPicker';
 import { TypingPlay, type TypingResultData, type TypingRule } from './TypingPlay';
 import { TypingResult } from './TypingResult';
+import { useTypingResults } from './useTypingResults';
 
 const CONTENT_HINTS: Record<ContentKind, string> = {
   copy: 'Thẻ hiện từ tiếng Anh, gõ y hệt (luyện chính tả).',
@@ -27,8 +28,6 @@ interface Props {
   onOnline: () => void;
   /** Review the given items as flashcards. */
   onReview?: (items: BattleItem[]) => void;
-  /** Called with each finished game (FSRS, history). */
-  onResult?: (data: TypingResultData, items: BattleItem[]) => void;
 }
 
 const deckLabelOf = (items: readonly BattleItem[]) => {
@@ -37,7 +36,8 @@ const deckLabelOf = (items: readonly BattleItem[]) => {
 };
 
 /** "Luyện Gõ": settings → choose words → play → result. */
-export function TypingGame({ onMenu, onOnline, onReview, onResult }: Props) {
+export function TypingGame({ onMenu, onOnline, onReview }: Props) {
+  const saveResults = useTypingResults();
   const [stage, setStage] = useState<'setup' | 'pick' | 'play' | 'result'>('setup');
   const [config, setConfig] = useState<TypingConfig>({ mode: 'solo', botLevel: 'normal', content: 'meaning', rule: 'hearts' });
   const [selection, setSelection] = useState(loadSelection);
@@ -166,7 +166,7 @@ export function TypingGame({ onMenu, onOnline, onReview, onResult }: Props) {
           const best = config.mode === 'solo' && data.result !== 'quit' ? recordTypingScore(typingScoreKey(items, config.content), data.score, data.wpm) : null;
           setResult({ data, best });
           setStage('result');
-          onResult?.(data, items);
+          saveResults(data);
         }}
       />
     );

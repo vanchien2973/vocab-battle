@@ -1,7 +1,7 @@
 import type { PendingBatch } from '../decks/db';
 import { isRetryable, type ProgressRepository } from '../decks/repository';
 import type { ItemType } from '../decks/types';
-import { countReview, dayKey, type Grade, type ProgressBatch, type StoredCard } from './fsrs';
+import { countReview, dayKey, TYPING_PROGRESS_ID, type Grade, type ProgressBatch, type StoredCard, type TypingSession } from './fsrs';
 
 /** Persistent store for batches that could not be sent yet (IndexedDB in the app, memory in tests). */
 export interface PendingStore {
@@ -41,13 +41,25 @@ export class ProgressQueue {
     return this.count >= FLUSH_EVERY ? this.flush() : Promise.resolve();
   }
 
+  /** Save a finished typing game in the "_typing" document (sent right away, queued when offline). */
+  recordTyping(session: TypingSession): Promise<void> {
+    const b = this.batches.get(TYPING_PROGRESS_ID) ?? { cards: {}, days: {} };
+    b.typing = [...(b.typing ?? []), session];
+    this.batches.set(TYPING_PROGRESS_ID, b);
+    return this.flush();
+  }
+
   get unsaved(): number {
     return this.count;
   }
 
   /** Send everything collected plus earlier pending batches. Never throws; failures stay queued. */
   flush(): Promise<void> {
-    this.flushing ??= this.doFlush().finally(() => (this.flushing = null));
+    this.flushing ??= this.doFlush().finally(() => {
+      this.flushing = null;
+      // Something recorded while sending: send it too.
+      if (this.batches.size) void this.flush();
+    });
     return this.flushing;
   }
 

@@ -9,6 +9,7 @@ import { OnlineGame } from './components/OnlineGame';
 import { DataProvider, useData } from './decks/DataContext';
 import { sharedFromSearch } from './decks/sharedSearch';
 import { roomFromSearch } from './net/roomCode';
+import type { BattleItem } from './data/words';
 
 // Deck management and study screens load on first use.
 const DecksPage = lazy(() => import('./components/decks/DecksPage').then((m) => ({ default: m.DecksPage })));
@@ -24,7 +25,7 @@ export type Screen =
   | { name: 'online'; room: string | null }
   | { name: 'decks' }
   | { name: 'deck'; id: string }
-  | { name: 'study'; deckIds: string[] | null; back: Screen }
+  | { name: 'study'; deckIds: string[] | null; items?: BattleItem[]; back: Screen }
   | { name: 'shared'; source: SharedSource }
   | { name: 'typing' };
 
@@ -61,10 +62,16 @@ export default function App() {
       );
       break;
     case 'study':
-      content = <StudyScreen deckIds={screen.deckIds} onBack={() => setScreen(screen.back)} />;
+      content = <StudyScreen deckIds={screen.deckIds} items={screen.items} onBack={() => setScreen(screen.back)} />;
       break;
     case 'typing':
-      content = <TypingGame onMenu={toMenu} onOnline={() => setScreen({ name: 'online', room: null })} />;
+      content = (
+        <TypingGame
+          onMenu={toMenu}
+          onOnline={() => setScreen({ name: 'online', room: null })}
+          onReview={(items) => setScreen({ name: 'study', deckIds: null, items, back: { name: 'typing' } })}
+        />
+      );
       break;
     case 'shared':
       content = (

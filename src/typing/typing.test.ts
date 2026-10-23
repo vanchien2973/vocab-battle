@@ -253,3 +253,55 @@ describe('layout', () => {
     expect(spreadX(s, 0.2)).toBe(0.2);
   });
 });
+
+describe('results → FSRS and history', () => {
+  it('maps clean / assisted / missed to Good / Hard / Again on the card of the content kind', async () => {
+    const { typingReviews } = await import('./progress');
+    const { Rating } = await import('../study/fsrs');
+    const own = (id: string, extra: Partial<BattleItem> = {}): BattleItem => ({ ...emptyItem('word', { id, text: id, meaning: 'm' }), deckId: 'd1', ...extra });
+    const reviews = typingReviews(
+      [
+        { item: own('a'), outcome: 'clean' },
+        { item: own('b~2', { sourceId: 'b' }), outcome: 'assisted' },
+        { item: own('c'), outcome: 'missed' },
+        { item: BUILTIN_ITEMS[0], outcome: 'missed' },
+      ],
+      'meaning',
+    );
+    expect(reviews).toEqual([
+      { deckId: 'd1', itemId: 'a', type: 'word', grade: Rating.Good, cardType: 'vi-en' },
+      { deckId: 'd1', itemId: 'b', type: 'word', grade: Rating.Hard, cardType: 'vi-en' },
+      { deckId: 'd1', itemId: 'c', type: 'word', grade: Rating.Again, cardType: 'vi-en' },
+    ]);
+    expect(typingReviews([{ item: own('a'), outcome: 'clean' }], 'listen')[0].cardType).toBe('listen');
+  });
+
+  it('keeps the newest 100 typing sessions without duplicates', async () => {
+    const { mergeTypingSessions } = await import('../study/fsrs');
+    const s = (i: number) => ({ at: new Date(Date.UTC(2026, 9, 23, 0, i)).toISOString(), score: i, wpm: 30, accuracy: 0.9, milestone: 2, content: 'copy' as const, mode: 'solo' as const });
+    const merged = mergeTypingSessions(
+      Array.from({ length: 90 }, (_, i) => s(i)),
+      [...Array.from({ length: 20 }, (_, i) => s(i + 90)), { ...s(5), score: 999 }],
+    );
+    expect(merged).toHaveLength(100);
+    expect(merged[0].score).toBe(10);
+    expect(merged[99].score).toBe(109);
+  });
+
+  it('the progress queue sends a typing session to the "_typing" document', async () => {
+    const { ProgressQueue, MemoryPendingStore } = await import('../study/progressQueue');
+    const { emptyProgress, mergeProgress } = await import('../study/fsrs');
+    const saved = new Map<string, ReturnType<typeof emptyProgress>>();
+    const repo = {
+      get: async (id: string) => saved.get(id) ?? emptyProgress(id),
+      merge: async (id: string, b: Parameters<typeof mergeProgress>[1]) => {
+        const m = mergeProgress(saved.get(id) ?? emptyProgress(id), b);
+        saved.set(id, m);
+        return m;
+      },
+    };
+    const q = new ProgressQueue(repo, new MemoryPendingStore(), '');
+    await q.recordTyping({ at: '2026-10-23T08:00:00.000Z', score: 50, wpm: 20, accuracy: 0.8, milestone: 2, content: 'cloze', mode: 'bot' });
+    expect(saved.get('_typing')!.typing).toHaveLength(1);
+  });
+});

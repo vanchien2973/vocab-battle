@@ -35,11 +35,27 @@ export interface DayStats {
   byType: Partial<Record<ItemType, [number, number]>>;
 }
 
+/** One finished Luyện Gõ game (kept in the "_typing" progress document). */
+export interface TypingSession {
+  at: string;
+  score: number;
+  wpm: number;
+  accuracy: number;
+  milestone: number;
+  content: 'copy' | 'meaning' | 'listen' | 'cloze';
+  mode: 'solo' | 'bot' | 'online';
+}
+
+export const TYPING_PROGRESS_ID = '_typing';
+export const MAX_TYPING_SESSIONS = 100;
+
 /** Progress of one deck: FSRS state per itemId|cardType plus daily stats. */
 export interface DeckProgress {
   deckId: string;
   cards: Record<string, StoredCard>;
   days: Record<string, DayStats>;
+  /** Only in the "_typing" document. */
+  typing?: TypingSession[];
   updatedAt: string;
   _etag?: string;
 }
@@ -48,6 +64,7 @@ export interface DeckProgress {
 export interface ProgressBatch {
   cards: Record<string, StoredCard>;
   days: Record<string, DayStats>;
+  typing?: TypingSession[];
 }
 
 export const KEEP_DAYS = 60;
@@ -187,7 +204,16 @@ export function mergeProgress(p: DeckProgress, batch: ProgressBatch, now = new D
   for (const [k, d] of Object.entries(batch.days)) days[k] = addDays(days[k], d);
   const cutoff = dayKey(new Date(now.getTime() - KEEP_DAYS * 86_400_000));
   for (const k of Object.keys(days)) if (k < cutoff) delete days[k];
-  return { ...p, cards, days, updatedAt: now.toISOString() };
+  const merged: DeckProgress = { ...p, cards, days, updatedAt: now.toISOString() };
+  if (batch.typing?.length) merged.typing = mergeTypingSessions(p.typing ?? [], batch.typing);
+  return merged;
+}
+
+/** Append sessions (no duplicates by time), keep the newest 100, oldest first. */
+export function mergeTypingSessions(existing: readonly TypingSession[], incoming: readonly TypingSession[]): TypingSession[] {
+  const byAt = new Map(existing.map((s) => [s.at, s]));
+  for (const s of incoming) byAt.set(s.at, s);
+  return [...byAt.values()].sort((a, b) => a.at.localeCompare(b.at)).slice(-MAX_TYPING_SESSIONS);
 }
 
 /** Share of a deck's items with at least one card that graduated to review (stability ≥ 1 day). */

@@ -293,6 +293,31 @@ public class DataTests
         Assert.Equal(400, (await Fails(() => Progress.MergeAsync(Alice, "d1", JsonNode.Parse(json)!.AsObject(), _ct))).Status);
 
     [Fact]
+    public async Task Typing_sessions_are_validated_appended_and_capped()
+    {
+        JsonObject Session(int i, double accuracy = 0.9) => new()
+        {
+            ["at"] = new DateTimeOffset(2026, 10, 23, 8, 0, 0, TimeSpan.Zero).AddMinutes(i).ToString("O"),
+            ["score"] = 100 + i, ["wpm"] = 30.5, ["accuracy"] = accuracy, ["milestone"] = 3, ["content"] = "meaning", ["mode"] = "solo",
+        };
+        JsonObject Batch(params JsonObject[] s) => new() { ["typing"] = new JsonArray(s.Select(x => (JsonNode?)x).ToArray()) };
+
+        for (var b = 0; b < 6; b++)
+            await Progress.MergeAsync(Alice, "_typing", Batch(Enumerable.Range(b * 20, 20).Select(i => Session(i)).ToArray()), _ct);
+        var p = await Progress.MergeAsync(Alice, "_typing", Batch(Session(119)), _ct); // duplicate time
+        var sessions = p["typing"]!.AsArray();
+        Assert.Equal(100, sessions.Count);
+        Assert.Equal(20 + 100, (int)sessions[0]!["score"]!);
+        Assert.Equal(219, (int)sessions[^1]!["score"]!);
+
+        Assert.Equal(400, (await Fails(() => Progress.MergeAsync(Alice, "_typing", Batch(Session(1, 1.5)), _ct))).Status);
+        var bad = Session(2);
+        bad["content"] = "essay";
+        Assert.Equal(400, (await Fails(() => Progress.MergeAsync(Alice, "_typing", Batch(bad), _ct))).Status);
+        Assert.Equal(400, (await Fails(() => Progress.MergeAsync(Alice, "_typing", Batch(Enumerable.Range(0, 21).Select(i => Session(i)).ToArray()), _ct))).Status);
+    }
+
+    [Fact]
     public async Task Deleting_a_deck_removes_its_progress()
     {
         var deck = await Decks.CreateAsync(Alice, DeckBody(), _ct);

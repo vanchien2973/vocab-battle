@@ -10,6 +10,18 @@ Game đấu từ vựng Anh–Việt: mỗi lượt có 1 từ tiếng Anh và 4
 
 Hosting: **Azure Static Web Apps (gói Free)**. Frontend Vite + React + TypeScript, API là **Azure Functions .NET 10 isolated** (managed functions) trong `api/`, gọi qua đường dẫn tương đối `/api/...` (cùng origin, không cần CORS).
 
+## ⌨️ Luyện Gõ
+
+Thẻ từ/cụm từ rơi xuống trên nền không gian; gõ đúng để bắn hạ trước khi chạm vạch đáy (3 tim).
+
+- **Kiểu nội dung**: Gõ lại (thẻ hiện từ tiếng Anh) · Nghĩa → Anh (thẻ hiện nghĩa) · Nghe (thẻ ẩn chữ, tự đọc; Tab hoặc chạm thẻ để nghe lại) · Cloze (câu ví dụ che cụm từ; mục không có ví dụ phù hợp thì hỏi nghĩa).
+- **Điều khiển**: gõ ký tự đầu để ngắm thẻ phù hợp gần đáy nhất; Backspace xoá, Esc bỏ ngắm; giữ `?` 1 giây (hoặc 💡) để lộ ký tự kế tiếp (−15 điểm). Không phân biệt hoa thường, cụm từ phải gõ đúng dấu cách. Hãy tắt bộ gõ tiếng Việt (app nhắc khi phát hiện Telex/VNI và tự bỏ dấu).
+- **20 mốc** (4 thẻ/mốc): qua mốc thì thẻ rơi nhanh hơn và nhiều hơn. Gõ sai mất combo.
+- **Chế độ**: Một mình (kỷ lục theo bộ từ + kiểu nội dung) · Đấu Bot (Dễ 22 / Thường 38 / Khó 58 WPM, sân Bot thu nhỏ bên cạnh) · Online 1v1 (chủ phòng chọn "⌨️ Luyện Gõ" ở bước chọn từ). Combo 5 gửi 1 thẻ tấn công (viền đỏ, rơi nhanh) sang đối thủ, combo 10 gửi 2. Luật: hết tim thì thua, hoặc **Đua mốc 20**. 2 người 1 bàn phím không hỗ trợ.
+- **Online**: cùng seed nên hai bên có cùng chuỗi từ rơi; mỗi bên gửi trạng thái tối giản ~5 lần/giây (`typingStatus`); chủ phòng giới hạn tần suất tấn công của khách và quyết định thắng/thua (`typingOver`).
+- **Kết quả**: điểm, mốc, WPM, độ chính xác, combo; danh sách từ gõ sai/để lọt với nút ôn bằng flashcard và hỏi AI. FSRS: gõ đúng ngay = Good, có sai/gợi ý = Hard, để lọt = Again (thẻ theo kiểu nội dung: Nghĩa → Anh = VI→EN, Nghe = Nghe, Cloze = Cloze, Gõ lại = EN→VI). Lịch sử phiên lưu trong progress `_typing` (100 phiên gần nhất) và hiện ở trang Ôn hôm nay.
+- **Kỹ thuật**: logic thuần, có seed trong `src/typing/engine.ts`; Canvas 2D + requestAnimationFrame với fixed timestep 1/60 s, thẻ và hiệu ứng dùng pool; React chỉ vẽ HUD qua store zustand; âm thanh Web Audio (nhớ tắt/bật); tự tạm dừng khi ẩn tab (online chỉ cảnh báo); hiệu ứng giảm khi bật reduced motion.
+
 ## Loại mục, kiểu thẻ, dạng câu hỏi
 
 **Loại mục** (`type`): `word` (từ đơn), `collocation` (vd *make a decision*), `phrasal_verb` (vd *look into*), `idiom` (vd *break the ice*), `pattern` (mẫu câu, vd *It's no use + V-ing*). Mỗi mục có `text`, `meaning`, tối đa 5 ví dụ `{en, vi}`, `ipa`/`partOfSpeech`/`note` tuỳ chọn, `tags`, `relatedTo` (mục gốc) và `distractors` (đáp án nhiễu do AI sinh sẵn khi lưu cụm từ, để battle không phải gọi AI). Giới hạn: 50 bộ/tài khoản, 500 mục/bộ.

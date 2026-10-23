@@ -17,6 +17,7 @@ import { WordPreview } from './prepare/WordPreview';
 import { ResultScreen } from './ResultScreen';
 import { TypingPlay, type RemoteLink } from './typing/TypingPlay';
 import { TypingResult } from './typing/TypingResult';
+import { useTypingResults } from './typing/useTypingResults';
 import { CONTENT_KINDS, CONTENT_LABELS, type ContentKind } from '../typing/types';
 import type { TypingResultData, TypingRule } from './typing/TypingPlay';
 
@@ -160,6 +161,7 @@ function OnlineRoom({
   const isHost = session instanceof HostSession;
   const showResult = useDelayedFlag(snap.phase === 'over', 1200);
   const [typingResult, setTypingResult] = useState<TypingResultData | null>(null);
+  const saveTypingResults = useTypingResults();
   const typingSeed = snap.typing?.seed;
   useEffect(() => setTypingResult(null), [typingSeed]);
   // Only the host's items carry deck ids, so only the host's FSRS progress changes.
@@ -201,7 +203,11 @@ function OnlineRoom({
   // Luyện Gõ: each side plays its own field; the host decides the winner.
   if (snap.typing && (snap.phase === 'playing' || snap.phase === 'over')) {
     if (snap.phase === 'playing' || !snap.typingOver) {
-      return <TypingPlay key={snap.typing.seed} items={snap.words} content={snap.typing.content} seed={snap.typing.seed} rule={snap.typing.rule} mode="online" remote={remoteLink(session, opponentName ?? 'Đối thủ')} deckLabel={`${snap.words.length} mục`} onFinish={(r) => setTypingResult(r)} />;
+      return <TypingPlay key={snap.typing.seed} items={snap.words} content={snap.typing.content} seed={snap.typing.seed} rule={snap.typing.rule} mode="online" remote={remoteLink(session, opponentName ?? 'Đối thủ')} deckLabel={`${snap.words.length} mục`} onFinish={(r) => {
+        setTypingResult(r);
+        // Only the host's items carry deck ids, so FSRS changes only for the host; both save their session.
+        saveTypingResults(r);
+      }} />;
     }
     const won = snap.typingOver.winner === me;
     const data = typingResult ?? null;

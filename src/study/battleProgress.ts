@@ -1,7 +1,7 @@
 import type { BattleItem } from '../data/words';
 import type { ItemType } from '../decks/types';
 import type { GameState, PlayerId } from '../game/types';
-import { cardKey, isNew, Rating, review, type DeckProgress, type Grade } from './fsrs';
+import { cardKey, isNew, Rating, review, type CardType, type DeckProgress, type Grade } from './fsrs';
 import type { ProgressQueue } from './progressQueue';
 
 export interface BattleReview {
@@ -9,6 +9,8 @@ export interface BattleReview {
   itemId: string;
   type: ItemType;
   grade: Grade;
+  /** Card the result trains; battles use EN → VI. */
+  cardType?: CardType;
 }
 
 /**
@@ -27,7 +29,7 @@ export function battleReviews(state: GameState, player: PlayerId, items: readonl
   return out;
 }
 
-/** Apply battle results to the EN → VI cards (the card a battle "Nghĩa" question trains) and flush. */
+/** Apply results to their cards (EN → VI unless a review says otherwise) and flush. */
 export async function applyBattleReviews(
   reviews: readonly BattleReview[],
   loadProgress: (deckId: string) => Promise<DeckProgress>,
@@ -37,7 +39,7 @@ export async function applyBattleReviews(
   const decks = [...new Set(reviews.map((r) => r.deckId))];
   const progress = new Map(await Promise.all(decks.map(async (d) => [d, await loadProgress(d)] as const)));
   for (const r of reviews) {
-    const key = cardKey(r.itemId, 'en-vi');
+    const key = cardKey(r.itemId, r.cardType ?? 'en-vi');
     const card = progress.get(r.deckId)?.cards[key];
     await queue.record(r.deckId, key, review(card, r.grade, now), r.type, r.grade, isNew(card));
   }

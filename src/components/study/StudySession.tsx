@@ -51,7 +51,8 @@ export function StudySession({ cards, typing, onFinish, onQuit }: Props) {
   const grade = (g: Grade) => {
     if (!current || !flipped) return;
     const after = review(current.card, g);
-    void queue.record(current.deckId, current.key, after, current.item.type, g, isNew(current.card));
+    // Built-in words (no deck) are practised without saving FSRS progress.
+    if (current.deckId) void queue.record(current.deckId, current.key, after, current.item.type, g, isNew(current.card));
     const next = [...results, { card: current, grade: g, after }];
     setResults(next);
     setFlipped(false);

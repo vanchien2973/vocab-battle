@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useData } from '../../decks/DataContext';
 import { ITEM_TYPE_LABELS, type Deck } from '../../decks/types';
-import { CARD_TYPES, CARD_TYPE_LABELS, Rating, type CardType, type DeckProgress } from '../../study/fsrs';
-import { buildQueue, computeStats, type StudyCard } from '../../study/queue';
+import { CARD_TYPES, CARD_TYPE_LABELS, cardKey, Rating, TYPING_PROGRESS_ID, type CardType, type DeckProgress, type TypingSession } from '../../study/fsrs';
+import { CONTENT_LABELS } from '../../typing/types';
+import { buildQueue, cardTypesFor, computeStats, type StudyCard } from '../../study/queue';
+import type { BattleItem } from '../../data/words';
 import { loadStudyLimits } from '../../study/settings';
 import { useAiUi } from '../ai/AiContext';
 import { StudySession, type SessionResult } from './StudySession';
@@ -18,7 +20,14 @@ const shuffle = <T,>(a: T[]): T[] => {
 };
 
 /** "Ôn hôm nay" (all decks) or one deck: stats, choose card type, study, summary. */
-export function StudyScreen({ deckIds, onBack }: { deckIds: string[] | null; onBack: () => void }) {
+interface Props {
+  deckIds: string[] | null;
+  /** Review exactly these items (e.g. words missed in Luyện Gõ) instead of today's queue. */
+  items?: BattleItem[];
+  onBack: () => void;
+}
+
+export function StudyScreen({ deckIds, items, onBack }: Props) {
   const data = useData();
   const { openSettings } = useAiUi();
   const [decks, setDecks] = useState<Deck[] | null>(null);
@@ -29,14 +38,16 @@ export function StudyScreen({ deckIds, onBack }: { deckIds: string[] | null; onB
   const [session, setSession] = useState<StudyCard[] | null>(null);
   const [summary, setSummary] = useState<SessionResult[] | null>(null);
   const [reload, setReload] = useState(0);
+  const [typingHistory, setTypingHistory] = useState<TypingSession[]>([]);
 
   useEffect(() => {
     if (data.summaries === null) return;
     let alive = true;
     void (async () => {
       try {
-        const ids = deckIds ?? data.summaries!.map((s) => s.id);
-        const loaded = await Promise.all(ids.map((id) => data.loadDeck(id)));
+        const ids = items ? [...new Set(items.flatMap((i) => (i.deckId ? [i.deckId] : [])))] : (deckIds ?? data.summaries!.map((s) => s.id));
+        if (!items && !deckIds) void data.loadProgress(TYPING_PROGRESS_ID).then((p) => alive && setTypingHistory(p.typing ?? []));
+        const loaded = items ? [] : await Promise.all(ids.map((id) => data.loadDeck(id)));
         const prog = await Promise.all(ids.map((id) => data.loadProgress(id)));
         if (!alive) return;
         setDecks(loaded);
@@ -54,7 +65,17 @@ export function StudyScreen({ deckIds, onBack }: { deckIds: string[] | null; onB
   const limits = loadStudyLimits();
   const cardTypes: CardType[] = mode === 'mix' ? [...CARD_TYPES] : [mode];
   const queue = useMemo(
-    () => (decks ? buildQueue(decks, progress, { limits, cardTypes, shuffle }) : []),
+    () =>
+      !decks
+        ? []
+        : items
+          ? items.flatMap((item) =>
+              cardTypesFor(item, cardTypes).map((cardType) => {
+                const key = cardKey(item.sourceId ?? item.id, cardType);
+                return { deckId: item.deckId ?? '', item, cardType, key, card: item.deckId ? progress.get(item.deckId)?.cards[key] : undefined };
+              }),
+            )
+          : buildQueue(decks, progress, { limits, cardTypes, shuffle }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [decks, progress, mode, limits.newPerDay, limits.reviewsPerDay],
   );
@@ -142,7 +163,7 @@ export function StudyScreen({ deckIds, onBack }: { deckIds: string[] | null; onB
     );
   }
 
-  const title = deckIds?.length === 1 ? (decks?.[0]?.name ?? '…') : 'Ôn hôm nay';
+  const title = items ? `Ôn ${items.length} từ vừa gõ sai` : deckIds?.length === 1 ? (decks?.[0]?.name ?? '…') : 'Ôn hôm nay';
   const maxReviews = Math.max(1, ...(stats?.last7.map((d) => d.reviews) ?? [1]));
 
   return (
@@ -196,6 +217,8 @@ export function StudyScreen({ deckIds, onBack }: { deckIds: string[] | null; onB
             )}
           </section>
 
+          {typingHistory.length > 0 && <TypingStats sessions={typingHistory} />}
+
           <section className="card">
             <h3>Kiểu thẻ</h3>
             <div className="chips" role="radiogroup" aria-label="Kiểu thẻ">
@@ -222,5 +245,29 @@ export function StudyScreen({ deckIds, onBack }: { deckIds: string[] | null; onB
         </>
       )}
     </div>
+  );
+}
+
+/** "⌨️ Luyện Gõ" card on the stats page: sessions, best WPM, average accuracy, last 5 games. */
+function TypingStats({ sessions }: { sessions: TypingSession[] }) {
+  const best = Math.max(...sessions.map((s) => s.wpm));
+  const avgAcc = sessions.reduce((n, s) => n + s.accuracy, 0) / sessions.length;
+  return (
+    <section className="card">
+      <h3>⌨️ Luyện Gõ</h3>
+      <p>
+        {sessions.length} phiên · WPM cao nhất <strong>{Math.round(best)}</strong> · chính xác trung bình <strong>{Math.round(avgAcc * 100)}%</strong>
+      </p>
+      <ul className="retention">
+        {sessions
+          .slice(-5)
+          .reverse()
+          .map((s) => (
+            <li key={s.at} className="small">
+              {new Date(s.at).toLocaleDateString('vi-VN')} · {CONTENT_LABELS[s.content]} · {s.score} điểm · {Math.round(s.wpm)} WPM · {Math.round(s.accuracy * 100)}% · mốc {s.milestone}
+            </li>
+          ))}
+      </ul>
+    </section>
   );
 }
