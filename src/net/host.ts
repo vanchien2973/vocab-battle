@@ -1,8 +1,8 @@
-import { ALL_WORDS, wordsFromIds, type Word } from '../data/words';
+import { ALL_WORDS, type Word } from '../data/words';
 import { Match, type MatchOptions } from '../game/match';
 import { MIN_SELECTED_WORDS } from '../game/questions';
 import type { GameState } from '../game/types';
-import type { Message } from './protocol';
+import { MAX_WORDSET, type Message } from './protocol';
 import { COUNTDOWN_SECONDS, SessionBase, cleanName, type OnlineSession } from './session';
 import type { GameTransport } from './transport';
 
@@ -70,13 +70,13 @@ export class HostSession extends SessionBase implements OnlineSession {
   }
 
   /** Confirm the word set chosen in step 1 and move both sides to the preview. */
-  setWordSet(wordIds: string[]): boolean {
-    const valid = wordsFromIds([...new Set(wordIds)]).map((w) => w.id);
-    if (valid.length < MIN_SELECTED_WORDS || this.snapshot.guestName === null) return false;
+  setWordSet(words: readonly Word[]): boolean {
+    const valid = [...new Map(words.map((w) => [w.id, w])).values()];
+    if (valid.length < MIN_SELECTED_WORDS || valid.length > MAX_WORDSET || this.snapshot.guestName === null) return false;
     if (this.snapshot.phase === 'countdown' || this.snapshot.phase === 'playing') return false;
     this.stopMatch();
-    this.update({ phase: 'preview', wordIds: valid, game: null });
-    this.transport.send({ type: 'wordset', wordIds: valid });
+    this.update({ phase: 'preview', words: valid, game: null });
+    this.transport.send({ type: 'wordset', words: valid });
     this.setReadiness({ host: false, guest: false });
     return true;
   }
@@ -92,7 +92,7 @@ export class HostSession extends SessionBase implements OnlineSession {
 
   /** After a match: back to the preview with the same word set. */
   rematch(): void {
-    if (this.snapshot.phase === 'over') this.setWordSet(this.snapshot.wordIds);
+    if (this.snapshot.phase === 'over') this.setWordSet(this.snapshot.words);
   }
 
   private setReadiness(ready: { host: boolean; guest: boolean }): void {
@@ -108,8 +108,9 @@ export class HostSession extends SessionBase implements OnlineSession {
   private startMatch(): void {
     const match = new Match({
       names: { p1: this.snapshot.hostName, p2: this.snapshot.guestName ?? 'Khách' },
-      selected: wordsFromIds(this.snapshot.wordIds),
-      pool: this.opts.pool ?? ALL_WORDS,
+      selected: this.snapshot.words,
+      // Saved words join the distractor pool so their meanings show up as options too.
+      pool: [...(this.opts.pool ?? ALL_WORDS), ...this.snapshot.words.filter((w) => w.id.startsWith('my:'))],
       graceMs: ONLINE_GRACE_MS,
       ...this.opts.match,
     });

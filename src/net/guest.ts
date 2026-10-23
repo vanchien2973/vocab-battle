@@ -1,4 +1,3 @@
-import { wordsFromIds } from '../data/words';
 import { PROTOCOL_VERSION, type Message } from './protocol';
 import { SessionBase, cleanName, type OnlineSession } from './session';
 import type { GameTransport } from './transport';
@@ -35,7 +34,7 @@ export class GuestSession extends SessionBase implements OnlineSession {
         this.stopCountdown();
         this.update({
           phase: 'preview',
-          wordIds: wordsFromIds(msg.wordIds).map((w) => w.id),
+          words: msg.words,
           ready: { host: false, guest: false },
           game: null,
         });

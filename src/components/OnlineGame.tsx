@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { wordsFromIds } from '../data/words';
+import { resolveWords } from '../data/catalog';
 import { useOnlineSession } from '../hooks/useOnlineSession';
 import { GuestSession } from '../net/guest';
 import { HostSession } from '../net/host';
@@ -205,7 +205,7 @@ function OnlineRoom({
 
   if (snap.phase === 'over' && snap.game) {
     return (
-      <ResultScreen state={snap.game} mode="online" viewers={[me]}>
+      <ResultScreen state={snap.game} mode="online" viewers={[me]} words={snap.words}>
         {session instanceof HostSession ? (
           <>
             <button type="button" className="btn primary" onClick={() => session.rematch()}>
@@ -277,7 +277,9 @@ function OnlineRoom({
 }
 
 function HostPicker({ session, onLeave }: { session: HostSession; onLeave: () => void }) {
-  const [ids, setIds] = useState<string[]>(() => (session.snapshot.wordIds.length ? session.snapshot.wordIds : loadSelection()));
+  const [ids, setIds] = useState<string[]>(() =>
+    session.snapshot.words.length ? session.snapshot.words.map((w) => w.id) : loadSelection(),
+  );
   return (
     <WordPicker
       selected={ids}
@@ -286,7 +288,8 @@ function HostPicker({ session, onLeave }: { session: HostSession; onLeave: () =>
       title={`Bạn chọn bộ từ cho cả hai. ${session.snapshot.guestName ?? 'Đối thủ'} sẽ xem nhưng không sửa được.`}
       onNext={() => {
         saveSelection(ids);
-        session.setWordSet(ids);
+        // Send full word content: the guest may not have the host's saved "Của tôi" words.
+        session.setWordSet(resolveWords(ids));
       }}
     />
   );
@@ -299,7 +302,7 @@ function PreviewStep({ session, snap, opponentName }: { session: OnlineSession; 
   const locked = snap.phase === 'countdown';
   return (
     <WordPreview
-      words={wordsFromIds(snap.wordIds)}
+      words={snap.words}
       onBack={session instanceof HostSession && !locked ? () => session.beginSelecting() : undefined}
       note={!isHost && <p className="muted">Bộ từ do chủ phòng chọn (chỉ xem).</p>}
     >

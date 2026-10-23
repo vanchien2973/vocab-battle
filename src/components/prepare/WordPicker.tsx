@@ -1,7 +1,10 @@
 import { useMemo, useState } from 'react';
-import { ALL_WORDS, LEVELS, filterWords, type Level } from '../../data/words';
+import { catalogWords } from '../../data/catalog';
+import { LEVELS, filterWords, type WordFilter } from '../../data/words';
 import { MIN_SELECTED_WORDS } from '../../game/questions';
 import { shuffle } from '../../game/rng';
+import { WordLink } from '../ai/AppHeader';
+import { useMyWordsVersion } from '../ai/AiContext';
 
 interface Props {
   selected: string[];
@@ -13,11 +16,15 @@ interface Props {
 
 /** Step 1: choose the words the match will ask. */
 export function WordPicker({ selected, onChange, onNext, onBack, title }: Props) {
-  const [level, setLevel] = useState<Level | 'all'>('all');
+  const [level, setLevel] = useState<WordFilter>('all');
   const [search, setSearch] = useState('');
   const [randomN, setRandomN] = useState(20);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
-  const visible = useMemo(() => filterWords(ALL_WORDS, level, search), [level, search]);
+  const myVersion = useMyWordsVersion();
+  // Built-in words plus "Của tôi"; re-read when the dictionary saves a word.
+  const catalog = useMemo(() => catalogWords(), [myVersion]);
+  const myCount = catalog.filter((w) => w.id.startsWith('my:')).length;
+  const visible = useMemo(() => filterWords(catalog, level, search), [catalog, level, search]);
   const enough = selected.length >= MIN_SELECTED_WORDS;
 
   const toggle = (id: string) =>
@@ -38,9 +45,9 @@ export function WordPicker({ selected, onChange, onNext, onBack, title }: Props)
         {title && <p className="muted">{title}</p>}
         <div className="filters">
           <div className="chips" role="group" aria-label="Lọc theo level">
-            {(['all', ...LEVELS] as const).map((l) => (
+            {(['all', ...LEVELS, 'mine'] as const).map((l) => (
               <button key={l} type="button" className={`chip ${level === l ? 'on' : ''}`} onClick={() => setLevel(l)}>
-                {l === 'all' ? 'Tất cả' : l}
+                {l === 'all' ? 'Tất cả' : l === 'mine' ? `⭐ Của tôi (${myCount})` : l}
               </button>
             ))}
           </div>
@@ -67,7 +74,7 @@ export function WordPicker({ selected, onChange, onNext, onBack, title }: Props)
               type="number"
               className="input tiny"
               min={1}
-              max={ALL_WORDS.length}
+              max={catalog.length}
               value={randomN}
               aria-label="Số từ ngẫu nhiên"
               onChange={(e) => setRandomN(Math.max(1, Number(e.target.value) || 1))}
@@ -89,11 +96,18 @@ export function WordPicker({ selected, onChange, onNext, onBack, title }: Props)
                   <span className="muted">{w.meaning}</span>
                 </span>
                 <span className={`badge lv-${w.level}`}>{w.level}</span>
+                <WordLink word={w.word}>📖</WordLink>
               </label>
             </li>
           );
         })}
-        {visible.length === 0 && <li className="muted empty">Không tìm thấy từ nào.</li>}
+        {visible.length === 0 && (
+          <li className="muted empty">
+            {level === 'mine' && myCount === 0
+              ? 'Chưa có từ nào. Tra từ bằng ô 📖 ở đầu trang rồi bấm "Thêm vào bộ từ của tôi".'
+              : 'Không tìm thấy từ nào.'}
+          </li>
+        )}
       </ul>
 
       <footer className="prepare-foot">

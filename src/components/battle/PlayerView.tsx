@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ROUND_TIME_MS } from '../../game/engine';
 import { opponentOf, type GameState, type PlayerId } from '../../game/types';
 import { useQuestionClock } from '../../hooks/useQuestionClock';
+import { useCompactHeader } from '../ai/AiContext';
 import { HpBar } from './HpBar';
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 
 /** One player's side of the battle: opponent HP, the question, own HP. */
 export function PlayerView({ state, me, onAnswer, keys = ['1', '2', '3', '4'], opponentLabel }: Props) {
+  useCompactHeader();
   const q = state.question;
   const [picked, setPicked] = useState<{ qid: string; index: number } | null>(null);
   const [timeUp, setTimeUp] = useState(false);

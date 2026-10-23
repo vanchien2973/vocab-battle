@@ -1,14 +1,14 @@
-import { wordsFromIds } from '../data/words';
+import { resolveWords } from '../data/catalog';
 import { readJSON, writeJSON } from './safeStorage';
 
 const SELECTION_KEY = 'vocab-battle.selection.v1';
 const NAME_KEY = 'vocab-battle.name.v1';
 
-/** Word ids selected last time; unknown ids (e.g. removed from words.json) are dropped. */
+/** Word ids selected last time; unknown ids (removed from words.json or from "Của tôi") are dropped. */
 export function loadSelection(): string[] {
   const ids = readJSON<unknown>(SELECTION_KEY, []);
   if (!Array.isArray(ids)) return [];
-  return wordsFromIds(ids.filter((id): id is string => typeof id === 'string')).map((w) => w.id);
+  return resolveWords(ids.filter((id): id is string => typeof id === 'string')).map((w) => w.id);
 }
 
 export function saveSelection(ids: readonly string[]): void {

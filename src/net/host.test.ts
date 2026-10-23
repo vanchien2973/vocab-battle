@@ -6,7 +6,9 @@ import { HostSession, ONLINE_GRACE_MS, sanitizeForGuest } from './host';
 import { createMemoryPair } from './memoryTransport';
 import { isMessage } from './protocol';
 
-const TEN = ALL_WORDS.slice(0, 10).map((w) => w.id);
+const TEN_WORDS = ALL_WORDS.slice(0, 10);
+const TEN = TEN_WORDS.map((w) => w.id);
+const ids = (words: { id: string }[]) => words.map((w) => w.id);
 
 function setup() {
   const pair = createMemoryPair();
@@ -22,7 +24,7 @@ function setup() {
 function toPreview() {
   const s = setup();
   s.host.beginSelecting();
-  expect(s.host.setWordSet(TEN)).toBe(true);
+  expect(s.host.setWordSet(TEN_WORDS)).toBe(true);
   return s;
 }
 
@@ -49,16 +51,28 @@ describe('online host/guest', () => {
     it('rejects fewer than 10 words', () => {
       const { host, guest } = setup();
       host.beginSelecting();
-      expect(host.setWordSet(TEN.slice(0, 9))).toBe(false);
-      expect(host.setWordSet([...TEN.slice(0, 9), 'not-a-word'])).toBe(false);
+      expect(host.setWordSet(TEN_WORDS.slice(0, 9))).toBe(false);
+      expect(host.setWordSet([...TEN_WORDS.slice(0, 9), TEN_WORDS[0]])).toBe(false); // duplicates count once
       expect(guest.snapshot.phase).toBe('selecting');
     });
 
-    it('sends the chosen word ids to the guest', () => {
+    it('sends the chosen words to the guest', () => {
       const { host, guest } = toPreview();
       expect(host.snapshot.phase).toBe('preview');
       expect(guest.snapshot.phase).toBe('preview');
-      expect(guest.snapshot.wordIds).toEqual(TEN);
+      expect(ids(guest.snapshot.words)).toEqual(TEN);
+    });
+
+    it('sends word content so saved words unknown to the guest still work', () => {
+      const { host, guest } = setup();
+      const mine = { id: 'my:resilient', word: 'resilient', meaning: 'kiên cường', example: 'She is resilient.', level: 'C1' as const };
+      host.beginSelecting();
+      expect(host.setWordSet([mine, ...TEN_WORDS.slice(0, 9)])).toBe(true);
+      expect(guest.snapshot.words[0]).toEqual(mine);
+      host.setReady(true);
+      guest.setReady(true);
+      vi.advanceTimersByTime(3000);
+      expect(guest.snapshot.phase).toBe('playing');
     });
   });
 
@@ -101,7 +115,7 @@ describe('online host/guest', () => {
       host.beginSelecting();
       expect(guest.snapshot.phase).toBe('selecting');
       expect(host.snapshot.ready).toEqual({ host: false, guest: false });
-      host.setWordSet(TEN);
+      host.setWordSet(TEN_WORDS);
       host.setReady(true);
       expect(host.snapshot.phase).toBe('preview'); // guest must ready again
     });
@@ -166,7 +180,7 @@ describe('online host/guest', () => {
       expect(guest.snapshot.game!.players.p2.wrongWordIds.length).toBeGreaterThan(0);
       host.rematch();
       expect(guest.snapshot.phase).toBe('preview');
-      expect(guest.snapshot.wordIds).toEqual(TEN);
+      expect(ids(guest.snapshot.words)).toEqual(TEN);
       expect(guest.snapshot.ready).toEqual({ host: false, guest: false });
     });
   });
@@ -190,7 +204,12 @@ describe('protocol', () => {
   it('validates incoming messages', () => {
     expect(isMessage({ type: 'answer', questionId: 'q', answerIndex: 1, ms: 10 })).toBe(true);
     expect(isMessage({ type: 'answer', questionId: 'q', answerIndex: '1', ms: 10 })).toBe(false);
-    expect(isMessage({ type: 'wordset', wordIds: ['a', 2] })).toBe(false);
+    const w = { id: 'my:x', word: 'x', meaning: 'y', example: '', level: 'B1' };
+    expect(isMessage({ type: 'wordset', words: [w] })).toBe(true);
+    expect(isMessage({ type: 'wordset', words: [{ ...w, level: 'Z9' }] })).toBe(false);
+    expect(isMessage({ type: 'wordset', words: [{ ...w, meaning: 'x'.repeat(301) }] })).toBe(false);
+    expect(isMessage({ type: 'wordset', words: Array(301).fill(w) })).toBe(false);
+    expect(isMessage({ type: 'wordset', wordIds: ['a'] })).toBe(false);
     expect(isMessage({ type: 'nope' })).toBe(false);
     expect(isMessage(null)).toBe(false);
   });

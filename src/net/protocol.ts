@@ -1,6 +1,10 @@
+import type { Word } from '../data/words';
 import type { GameState } from '../game/types';
 
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
+/** Limits for word sets received from the peer. */
+export const MAX_WORDSET = 300;
+export const MAX_FIELD_LENGTH = 300;
 
 /** Messages exchanged between host (authoritative) and guest. */
 export type Message =
@@ -10,8 +14,8 @@ export type Message =
   | { type: 'lobby'; hostName: string; guestName: string }
   /** host → guest: host is (re)choosing the word set; readiness is reset */
   | { type: 'selecting' }
-  /** host → guest: the chosen word set; both sides move to the preview step */
-  | { type: 'wordset'; wordIds: string[] }
+  /** host → guest: the chosen words with their content (so saved "Của tôi" words work too); both move to preview */
+  | { type: 'wordset'; words: Word[] }
   /** guest → host: guest toggled "Sẵn sàng" */
   | { type: 'ready'; ready: boolean }
   /** host → guest: readiness of both sides */
@@ -30,6 +34,23 @@ export type MessageType = Message['type'];
 const isStr = (v: unknown): v is string => typeof v === 'string';
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const isBool = (v: unknown): v is boolean => typeof v === 'boolean';
+const isField = (v: unknown): v is string => isStr(v) && v.length <= MAX_FIELD_LENGTH;
+const WORD_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
+
+export function isWordPayload(v: unknown): v is Word {
+  const w = v as Record<string, unknown>;
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    isField(w.id) &&
+    isField(w.word) &&
+    w.word.trim() !== '' &&
+    isField(w.meaning) &&
+    w.meaning.trim() !== '' &&
+    isField(w.example) &&
+    WORD_LEVELS.includes(w.level as string)
+  );
+}
 
 /** Validate untrusted data received from the peer. */
 export function isMessage(data: unknown): data is Message {
@@ -44,7 +65,7 @@ export function isMessage(data: unknown): data is Message {
     case 'leave':
       return true;
     case 'wordset':
-      return Array.isArray(m.wordIds) && m.wordIds.every(isStr);
+      return Array.isArray(m.words) && m.words.length <= MAX_WORDSET && m.words.every(isWordPayload);
     case 'ready':
       return isBool(m.ready);
     case 'readyState':

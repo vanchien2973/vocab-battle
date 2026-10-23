@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
-import { wordsFromIds } from '../data/words';
+import type { Word } from '../data/words';
 import { matchScore } from '../game/engine';
 import type { GameState, PlayerId } from '../game/types';
 import { recordMatch, type ScoreMode } from '../storage/highScore';
+import { WordLink } from './ai/AppHeader';
+import { useAiUi } from './ai/AiContext';
 import { SpeakButton } from './prepare/SpeakButton';
 
 interface Props {
@@ -10,6 +12,8 @@ interface Props {
   mode: ScoreMode;
   /** Players on this device: their scores are saved and their wrong words listed. */
   viewers: PlayerId[];
+  /** Words of this match, used to show the wrong ones (online they come from the host). */
+  words: readonly Word[];
   children: ReactNode;
 }
 
@@ -27,7 +31,15 @@ function record(state: GameState, mode: ScoreMode, viewers: PlayerId[]) {
   return r;
 }
 
-export function ResultScreen({ state, mode, viewers, children }: Props) {
+/** Pre-filled chat message asking the tutor about the words a player got wrong. */
+export function wrongWordsPrompt(words: readonly Word[]): string {
+  const list = words.map((w) => `- ${w.word} (${w.meaning})`).join('\n');
+  return `Mình vừa trả lời sai các từ sau trong trận đấu:\n${list}\nHãy giải thích ngắn gọn từng từ, cho ví dụ và mẹo ghi nhớ giúp mình.`;
+}
+
+export function ResultScreen({ state, mode, viewers, words: matchWords, children }: Props) {
+  const { openChat } = useAiUi();
+  const byId = new Map(matchWords.map((w) => [w.id, w]));
   const records = record(state, mode, viewers);
   const winner = state.winner ? state.players[state.winner] : null;
   const title =
@@ -66,10 +78,15 @@ export function ResultScreen({ state, mode, viewers, children }: Props) {
       <div className="actions">{children}</div>
 
       {viewers.map((id) => {
-        const words = wordsFromIds(state.players[id].wrongWordIds);
+        const words = state.players[id].wrongWordIds.map((wid) => byId.get(wid)).filter((w): w is Word => !!w);
         return (
           <section key={id} className="review">
             <h2>{viewers.length > 1 ? `Ôn lại – ${state.players[id].name}` : 'Từ cần ôn lại'}</h2>
+            {words.length > 0 && (
+              <button type="button" className="btn primary small ask-ai" onClick={() => openChat({ mode: 'explain', message: wrongWordsPrompt(words) })}>
+                🧑‍🏫 Hỏi AI về các từ {viewers.length > 1 ? `${state.players[id].name} làm sai` : 'tôi làm sai'}
+              </button>
+            )}
             {words.length === 0 ? (
               <p className="muted">Không sai từ nào. Tuyệt vời! 🎉</p>
             ) : (
@@ -77,7 +94,10 @@ export function ResultScreen({ state, mode, viewers, children }: Props) {
                 {words.map((w) => (
                   <li key={w.id}>
                     <div>
-                      <strong>{w.word}</strong> – {w.meaning}
+                      <WordLink word={w.word}>
+                        <strong>{w.word}</strong>
+                      </WordLink>{' '}
+                      – {w.meaning}
                       <div className="example muted">{w.example}</div>
                     </div>
                     <SpeakButton text={w.word} />

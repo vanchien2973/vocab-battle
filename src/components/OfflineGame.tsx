@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { BotLevel } from '../controllers/bot';
-import { wordsFromIds } from '../data/words';
+import { resolveWords } from '../data/catalog';
 import { useCountdown } from '../hooks/useCountdown';
 import { useOfflineMatch, type OfflineMatchConfig } from '../hooks/useOfflineMatch';
 import { COUNTDOWN_SECONDS } from '../net/session';
@@ -60,7 +60,7 @@ export function OfflineGame({ config, onMenu }: { config: OfflineConfig; onMenu:
     const locked = countdown.value !== null;
     return (
       <>
-        <WordPreview words={wordsFromIds(wordIds)} onBack={locked ? undefined : () => setStage('pick')}>
+        <WordPreview words={resolveWords(wordIds)} onBack={locked ? undefined : () => setStage('pick')}>
           {isLocal ? (
             (['p1', 'p2'] as const).map((id) => (
               <button key={id} type="button" className={`btn ${ready[id] ? 'ready' : 'primary'}`} disabled={locked} onClick={() => toggleReady(id)}>
@@ -100,14 +100,15 @@ interface BattleProps {
 
 function OfflineBattle({ config, wordIds, onReplay, onChangeWords, onMenu }: BattleProps) {
   const [cfg] = useState(() => matchConfig(config));
-  const { state, submit } = useOfflineMatch(cfg, wordIds);
+  const [words] = useState(() => resolveWords(wordIds));
+  const { state, submit } = useOfflineMatch(cfg, words);
   const showResult = useDelayedFlag(state?.phase === 'over', 1200);
   if (!state) return null;
 
   const isLocal = config.mode === 'local';
   if (showResult) {
     return (
-      <ResultScreen state={state} mode={config.mode} viewers={isLocal ? ['p1', 'p2'] : ['p1']}>
+      <ResultScreen state={state} mode={config.mode} viewers={isLocal ? ['p1', 'p2'] : ['p1']} words={words}>
         <button type="button" className="btn primary" onClick={onReplay}>
           🔁 Chơi lại
         </button>

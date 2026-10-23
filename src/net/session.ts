@@ -1,3 +1,4 @@
+import type { Word } from '../data/words';
 import type { GameState, PlayerId } from '../game/types';
 import type { ConnectionStatus, GameTransport } from './transport';
 
@@ -16,7 +17,7 @@ export interface OnlineSnapshot {
   phase: OnlinePhase;
   hostName: string;
   guestName: string | null;
-  wordIds: string[];
+  words: Word[];
   ready: { host: boolean; guest: boolean };
   countdown: number | null;
   game: GameState | null;
@@ -53,7 +54,7 @@ export abstract class SessionBase {
       phase: 'lobby',
       hostName,
       guestName: null,
-      wordIds: [],
+      words: [],
       ready: { host: false, guest: false },
       countdown: null,
       game: null,

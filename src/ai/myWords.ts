@@ -1,6 +1,6 @@
 import type { Word } from '../data/words';
 import { readJSON, writeJSON } from '../storage/safeStorage';
-import { normalizeWord } from './shared';
+import { normalizeWord } from './normalize';
 import { CEFR_LEVELS, type LookupEntry } from './types';
 
 const KEY = 'vocab-battle.mywords.v1';

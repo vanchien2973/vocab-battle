@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { Word } from '../../data/words';
+import { WordLink } from '../ai/AppHeader';
 import { SpeakButton } from './SpeakButton';
 
 interface Props {
@@ -60,7 +61,10 @@ export function WordPreview({ words, onBack, note, children }: Props) {
             <div className="face front">
               <span className={`badge lv-${word.level}`}>{word.level}</span>
               <h2>{word.word}</h2>
-              <SpeakButton text={word.word} />
+              <span className="card-tools">
+                <SpeakButton text={word.word} />
+                <WordLink word={word.word}>📖</WordLink>
+              </span>
               <span className="hint">Chạm để lật</span>
             </div>
             <div className="face back">
@@ -88,7 +92,10 @@ export function WordPreview({ words, onBack, note, children }: Props) {
           {words.map((w) => (
             <li key={w.id}>
               <div>
-                <strong>{w.word}</strong> <span className={`badge lv-${w.level}`}>{w.level}</span>
+                <WordLink word={w.word}>
+                  <strong>{w.word}</strong>
+                </WordLink>{' '}
+                <span className={`badge lv-${w.level}`}>{w.level}</span>
                 <div>{w.meaning}</div>
                 <div className="example muted">{w.example}</div>
               </div>

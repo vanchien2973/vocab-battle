@@ -1,5 +1,5 @@
 import { readJSON, writeJSON } from '../storage/safeStorage';
-import { normalizeWord } from './shared';
+import { normalizeWord } from './normalize';
 import type { LookupEntry } from './types';
 
 const KEY = 'vocab-battle.lookup.v1';
