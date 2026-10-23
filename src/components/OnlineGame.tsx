@@ -15,6 +15,10 @@ import { CountdownOverlay } from './prepare/CountdownOverlay';
 import { ItemPicker } from './prepare/ItemPicker';
 import { WordPreview } from './prepare/WordPreview';
 import { ResultScreen } from './ResultScreen';
+import { TypingPlay, type RemoteLink } from './typing/TypingPlay';
+import { TypingResult } from './typing/TypingResult';
+import { CONTENT_KINDS, CONTENT_LABELS, type ContentKind } from '../typing/types';
+import type { TypingResultData, TypingRule } from './typing/TypingPlay';
 
 const STATUS_LABEL: Record<ConnectionStatus, string> = {
   connecting: 'Đang kết nối…',
@@ -155,6 +159,9 @@ function OnlineRoom({
   const snap = useOnlineSession(session)!;
   const isHost = session instanceof HostSession;
   const showResult = useDelayedFlag(snap.phase === 'over', 1200);
+  const [typingResult, setTypingResult] = useState<TypingResultData | null>(null);
+  const typingSeed = snap.typing?.seed;
+  useEffect(() => setTypingResult(null), [typingSeed]);
   // Only the host's items carry deck ids, so only the host's FSRS progress changes.
   useBattleProgress(snap.phase === 'over' && session.role === 'host' ? snap.game : null, session.me, snap.words);
 
@@ -190,6 +197,37 @@ function OnlineRoom({
 
   const opponentName = isHost ? snap.guestName : snap.hostName;
   const me = session.me;
+
+  // Luyện Gõ: each side plays its own field; the host decides the winner.
+  if (snap.typing && (snap.phase === 'playing' || snap.phase === 'over')) {
+    if (snap.phase === 'playing' || !snap.typingOver) {
+      return <TypingPlay key={snap.typing.seed} items={snap.words} content={snap.typing.content} seed={snap.typing.seed} rule={snap.typing.rule} mode="online" remote={remoteLink(session, opponentName ?? 'Đối thủ')} deckLabel={`${snap.words.length} mục`} onFinish={(r) => setTypingResult(r)} />;
+    }
+    const won = snap.typingOver.winner === me;
+    const data = typingResult ?? null;
+    return (
+      <TypingResult data={{ ...(data ?? EMPTY_TYPING), result: won ? 'win' : 'lose', reason: snap.typingOver.reason, content: snap.typing.content, mode: 'online' }}>
+        {session instanceof HostSession ? (
+          <>
+            <button type="button" className="btn primary" onClick={() => session.rematch()}>
+              🔁 Chơi lại
+            </button>
+            <button type="button" className="btn" onClick={() => session.beginSelecting()}>
+              Đổi bộ từ
+            </button>
+          </>
+        ) : (
+          <>
+            <SaveDeckButton items={snap.words} hostName={snap.hostName} />
+            <span className="muted">Chờ chủ phòng chọn chơi lại…</span>
+          </>
+        )}
+        <button type="button" className="btn ghost" onClick={onMenu}>
+          Rời phòng
+        </button>
+      </TypingResult>
+    );
+  }
 
   if ((snap.phase === 'playing' || (snap.phase === 'over' && !showResult)) && snap.game) {
     return (
@@ -285,20 +323,70 @@ function OnlineRoom({
 
 function HostPicker({ session, onLeave }: { session: HostSession; onLeave: () => void }) {
   const [selection, setSelection] = useState(loadSelection);
+  const prev = session.snapshot.typing;
+  const [game, setGame] = useState<'quiz' | 'typing'>(prev ? 'typing' : 'quiz');
+  const [content, setContent] = useState<ContentKind>(prev?.content ?? 'meaning');
+  const [rule, setRule] = useState<TypingRule>(prev?.rule ?? 'hearts');
   return (
-    <ItemPicker
-      selection={selection}
-      onChange={setSelection}
-      onBack={onLeave}
-      title={`Bạn chọn bộ từ cho cả hai. ${session.snapshot.guestName ?? 'Đối thủ'} sẽ xem nhưng không sửa được.`}
-      onNext={(items, kinds) => {
-        saveSelection(selection);
-        savePracticeWords(items);
-        // Full item content goes to the guest: they do not have the host's decks.
-        session.setWordSet(items, kinds);
-      }}
-    />
+    <>
+      <div className="card online-game-type">
+        <div className="chips" role="radiogroup" aria-label="Kiểu trận">
+          <button type="button" role="radio" aria-checked={game === 'quiz'} className={`chip ${game === 'quiz' ? 'on' : ''}`} onClick={() => setGame('quiz')}>
+            ⚔️ Trắc nghiệm
+          </button>
+          <button type="button" role="radio" aria-checked={game === 'typing'} className={`chip ${game === 'typing' ? 'on' : ''}`} onClick={() => setGame('typing')}>
+            ⌨️ Luyện Gõ
+          </button>
+        </div>
+        {game === 'typing' && (
+          <div className="chips">
+            {CONTENT_KINDS.map((k) => (
+              <button key={k} type="button" className={`chip ${content === k ? 'on' : ''}`} onClick={() => setContent(k)}>
+                {CONTENT_LABELS[k]}
+              </button>
+            ))}
+            <button type="button" className={`chip ${rule === 'hearts' ? 'on' : ''}`} onClick={() => setRule('hearts')}>
+              ❤️ Hết tim thì thua
+            </button>
+            <button type="button" className={`chip ${rule === 'race' ? 'on' : ''}`} onClick={() => setRule('race')}>
+              🏁 Đua mốc 20
+            </button>
+          </div>
+        )}
+      </div>
+      <ItemPicker
+        selection={selection}
+        onChange={setSelection}
+        onBack={onLeave}
+        hideKinds={game === 'typing'}
+        title={`Bạn chọn bộ từ cho cả hai. ${session.snapshot.guestName ?? 'Đối thủ'} sẽ xem nhưng không sửa được.`}
+        onNext={(items, kinds) => {
+          saveSelection(selection);
+          savePracticeWords(items);
+          // Full item content goes to the guest: they do not have the host's decks.
+          session.setWordSet(items, kinds, game === 'typing' ? { type: 'typing', seed: (Math.random() * 2 ** 32) >>> 0, content, rule } : null);
+        }}
+      />
+    </>
   );
+}
+
+const EMPTY_TYPING: TypingResultData = { result: 'lose', score: 0, milestone: 1, wpm: 0, accuracy: 1, maxCombo: 0, content: 'meaning', mode: 'online', outcomes: [] };
+
+/** The play screen's view of the PeerJS session. */
+function remoteLink(session: OnlineSession, opponentName: string): RemoteLink {
+  return {
+    opponentName,
+    sendStatus: (s) => session.sendTypingStatus(s),
+    sendAttack: (n) => session.sendTypingAttack(n),
+    reportDone: (reason, milestone) => session.reportTypingDone(reason, milestone),
+    onAttack: (cb) => session.onTyping((e) => e.type === 'attack' && cb(e.count)),
+    onOpponent: (cb) => session.onTyping((e) => e.type === 'status' && cb({ name: opponentName, ...e.status })),
+    onOver: (cb) =>
+      session.subscribe((s) => {
+        if (s.typingOver) cb(s.typingOver.winner === session.me, s.typingOver.reason);
+      }),
+  };
 }
 
 /** Guest after a match: keep the host's items as a new deck. */

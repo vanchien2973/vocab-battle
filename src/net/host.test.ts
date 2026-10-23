@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BUILTIN_ITEMS as ALL_WORDS, type BattleItem } from '../data/words';
 import { mulberry32 } from '../game/rng';
 import { GuestSession } from './guest';
-import { HostSession, ONLINE_GRACE_MS, sanitizeForGuest } from './host';
+import { ATTACK_MIN_INTERVAL_MS, HostSession, ONLINE_GRACE_MS, sanitizeForGuest } from './host';
 import { createMemoryPair } from './memoryTransport';
 import { isMessage } from './protocol';
 
@@ -245,5 +245,97 @@ describe('protocol', () => {
       winner: null,
     };
     expect(sanitizeForGuest(state)).toBe(state);
+  });
+});
+
+describe('online Luyện Gõ', () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  const setupTyping = { type: 'typing' as const, seed: 1234, content: 'meaning' as const, rule: 'hearts' as const };
+
+  function toTyping() {
+    const s = setup();
+    s.host.beginSelecting();
+    expect(s.host.setWordSet(TEN_WORDS, ['meaning'], setupTyping)).toBe(true);
+    s.host.setReady(true);
+    s.guest.setReady(true);
+    vi.advanceTimersByTime(3000);
+    return s;
+  }
+
+  it('sends the seed and settings, then both sides play without a quiz match', () => {
+    const { host, guest } = toTyping();
+    expect(guest.snapshot.typing).toEqual(setupTyping);
+    expect(host.snapshot.phase).toBe('playing');
+    expect(guest.snapshot.phase).toBe('playing');
+    expect(host.snapshot.game).toBeNull();
+  });
+
+  it('relays field status both ways', () => {
+    const { host, guest } = toTyping();
+    const seen: unknown[] = [];
+    guest.onTyping((e) => seen.push(e));
+    host.onTyping((e) => seen.push(e));
+    const status = { score: 120, milestone: 2, hearts: 3, combo: 4, wpm: 31, cards: [[0.5, 0.3, 0] as [number, number, 0]] };
+    host.sendTypingStatus(status);
+    guest.sendTypingStatus({ ...status, score: 80 });
+    expect(seen).toEqual([
+      { type: 'status', status },
+      { type: 'status', status: { ...status, score: 80 } },
+    ]);
+  });
+
+  it('host applies guest attacks at most once per interval, and splits its own bursts', () => {
+    const { host, guest } = toTyping();
+    const toHost: number[] = [];
+    const toGuest: number[] = [];
+    host.onTyping((e) => e.type === 'attack' && toHost.push(e.count));
+    guest.onTyping((e) => e.type === 'attack' && toGuest.push(e.count));
+    guest.sendTypingAttack(1);
+    guest.sendTypingAttack(2); // too soon: ignored
+    vi.advanceTimersByTime(ATTACK_MIN_INTERVAL_MS);
+    guest.sendTypingAttack(5); // capped at 2
+    expect(toHost).toEqual([1, 2]);
+    host.sendTypingAttack(3);
+    expect(toGuest).toEqual([2, 1]);
+  });
+
+  it('the host decides the winner and a rematch uses a new seed', () => {
+    const { host, guest } = toTyping();
+    guest.reportTypingDone('dead', 4);
+    expect(host.snapshot.typingOver).toEqual({ winner: 'p1', reason: 'Bình hết tim' });
+    expect(guest.snapshot.phase).toBe('over');
+    expect(guest.snapshot.typingOver?.winner).toBe('p1');
+    host.reportTypingDone('race'); // already decided
+    expect(guest.snapshot.typingOver?.winner).toBe('p1');
+    host.rematch();
+    expect(guest.snapshot.phase).toBe('preview');
+    expect(guest.snapshot.typing?.seed).not.toBe(1234);
+  });
+
+  it('race: the first player past milestone 20 wins', () => {
+    const { host, guest } = toTyping();
+    host.reportTypingDone('race');
+    expect(guest.snapshot.typingOver).toEqual({ winner: 'p1', reason: 'An qua mốc 20 trước' });
+  });
+
+  it('validates the new messages', () => {
+    const w = { id: 'x', type: 'word', text: 'cat', meaning: 'mèo', examples: [], tags: [] };
+    expect(isMessage({ type: 'itemset', items: [w], kinds: ['meaning'], game: setupTyping })).toBe(true);
+    expect(isMessage({ type: 'itemset', items: [w], kinds: ['meaning'], game: { ...setupTyping, content: 'essay' } })).toBe(false);
+    expect(isMessage({ type: 'itemset', items: [w], kinds: ['meaning'], game: { ...setupTyping, seed: -1 } })).toBe(false);
+    const st = { type: 'typingStatus', score: 1, milestone: 1, hearts: 3, combo: 0, wpm: 10, cards: [[0.2, 0.4, 1]] };
+    expect(isMessage(st)).toBe(true);
+    expect(isMessage({ ...st, cards: Array(17).fill([0.1, 0.1, 0]) })).toBe(false);
+    expect(isMessage({ ...st, milestone: 21 })).toBe(false);
+    expect(isMessage({ ...st, cards: [[2, 0, 0]] })).toBe(false);
+    expect(isMessage({ type: 'typingAttack', count: 2 })).toBe(true);
+    expect(isMessage({ type: 'typingAttack', count: 3 })).toBe(false);
+    expect(isMessage({ type: 'typingDone', reason: 'race', milestone: 20 })).toBe(true);
+    expect(isMessage({ type: 'typingDone', reason: 'quit', milestone: 2 })).toBe(false);
+    expect(isMessage({ type: 'typingOver', winner: 'p2', reason: 'x' })).toBe(true);
+    expect(isMessage({ type: 'typingOver', winner: 'p3', reason: 'x' })).toBe(false);
+    expect(isMessage({ type: 'typingStart' })).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import type { BattleItem } from '../data/words';
 import { QUESTION_KINDS, type GameState, type PlayerId, type QuestionKind } from '../game/types';
+import type { TypingSetup, TypingStatus } from './protocol';
 import type { ConnectionStatus, GameTransport } from './transport';
 
 export const COUNTDOWN_SECONDS = 3;
@@ -22,8 +23,15 @@ export interface OnlineSnapshot {
   ready: { host: boolean; guest: boolean };
   countdown: number | null;
   game: GameState | null;
+  /** Set when the host picked Luyện Gõ instead of the quiz battle. */
+  typing: TypingSetup | null;
+  /** Host's decision for a finished typing match. */
+  typingOver: { winner: PlayerId; reason: string } | null;
   opponentLeft: boolean;
 }
+
+/** Typing events that are not state: the opponent's field view and incoming attack cards. */
+export type TypingEvent = { type: 'status'; status: TypingStatus } | { type: 'attack'; count: 1 | 2 };
 
 /** What the online UI needs, whichever side it is on. */
 export interface OnlineSession {
@@ -35,6 +43,12 @@ export interface OnlineSession {
   submitAnswer(questionId: string, answerIndex: number | null, ms: number): void;
   /** Host only: end the explanation after a round early. */
   skipReveal(): void;
+  sendTypingStatus(status: TypingStatus): void;
+  /** Attack cards earned by this player (the host checks guest requests). */
+  sendTypingAttack(count: number): void;
+  /** This player's field ended. */
+  reportTypingDone(reason: 'dead' | 'race', milestone: number): void;
+  onTyping(cb: (e: TypingEvent) => void): () => void;
   leave(): void;
 }
 
@@ -46,6 +60,7 @@ export function cleanName(name: string, fallback: string): string {
 export abstract class SessionBase {
   snapshot: OnlineSnapshot;
   private listeners = new Set<(s: OnlineSnapshot) => void>();
+  private typingListeners = new Set<(e: TypingEvent) => void>();
   private countdownTimer: ReturnType<typeof setTimeout> | null = null;
   private wasConnected = false;
   protected readonly unsubscribers: Array<() => void> = [];
@@ -62,6 +77,8 @@ export abstract class SessionBase {
       ready: { host: false, guest: false },
       countdown: null,
       game: null,
+      typing: null,
+      typingOver: null,
       opponentLeft: false,
     };
     this.unsubscribers.push(
@@ -80,6 +97,19 @@ export abstract class SessionBase {
   subscribe(cb: (s: OnlineSnapshot) => void): () => void {
     this.listeners.add(cb);
     return () => this.listeners.delete(cb);
+  }
+
+  onTyping(cb: (e: TypingEvent) => void): () => void {
+    this.typingListeners.add(cb);
+    return () => this.typingListeners.delete(cb);
+  }
+
+  protected emitTyping(e: TypingEvent): void {
+    for (const cb of [...this.typingListeners]) cb(e);
+  }
+
+  sendTypingStatus(status: TypingStatus): void {
+    if (this.snapshot.phase === 'playing' && this.snapshot.typing) this.transport.send({ type: 'typingStatus', ...status });
   }
 
   protected update(patch: Partial<OnlineSnapshot>): void {
@@ -127,6 +157,7 @@ export abstract class SessionBase {
     this.cleanup();
     for (const u of this.unsubscribers) u();
     this.listeners.clear();
+    this.typingListeners.clear();
     this.transport.close();
   }
 }

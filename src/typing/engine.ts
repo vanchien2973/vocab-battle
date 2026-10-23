@@ -108,8 +108,22 @@ function nextTarget(s: FieldState): number {
   return t;
 }
 
+/** Move a new card sideways if it would sit on top of a card near the top (no random draws: stays deterministic). */
+export function spreadX(s: FieldState, x: number): number {
+  const near = (cx: number) => s.cards.some((c) => c.active && c.y < 0.4 && Math.abs(c.x - cx) < 0.2);
+  if (!near(x)) return x;
+  for (const d of [0.25, -0.25, 0.45, -0.45, 0.6, -0.6]) {
+    let nx = x + d;
+    if (nx > 0.86) nx -= 0.72;
+    if (nx < 0.14) nx += 0.72;
+    if (!near(nx)) return nx;
+  }
+  return x;
+}
+
 function place(s: FieldState, slot: number, target: number, x: number, speed: number, attack: boolean) {
   const c = s.cards[slot];
+  x = spreadX(s, x);
   c.active = true;
   c.serial = ++s.serial;
   c.target = target;
@@ -132,7 +146,7 @@ function spawn(s: FieldState) {
   const r2 = s.spawnRng();
   if (slot < 0) return;
   const { speed } = difficulty(s.milestone);
-  place(s, slot, target, 0.14 + r1 * 0.72, speed * (0.85 + r2 * 0.3), false);
+  place(s, slot, target, 0.14 + r1 * 0.72, speed * (0.9 + r2 * 0.2), false);
 }
 
 /** Cards sent by the opponent: random items, faster, red border. They do not count for milestones. */

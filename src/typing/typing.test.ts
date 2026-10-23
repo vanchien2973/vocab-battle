@@ -241,3 +241,15 @@ describe('input with Vietnamese IMEs', () => {
     expect(looksVietnameseIme('a')).toBe(false);
   });
 });
+
+describe('layout', () => {
+  it('spreads new cards away from cards near the top', async () => {
+    const { spreadX } = await import('./engine');
+    const s = createField({ items, content: 'copy', seed: 1 });
+    s.cards[0].active = true;
+    s.cards[0].x = 0.5;
+    s.cards[0].y = 0.1;
+    expect(Math.abs(spreadX(s, 0.55) - 0.5)).toBeGreaterThanOrEqual(0.2);
+    expect(spreadX(s, 0.2)).toBe(0.2);
+  });
+});

@@ -36,6 +36,8 @@ export class GuestSession extends SessionBase implements OnlineSession {
           phase: 'preview',
           words: msg.items,
           kinds: msg.kinds,
+          typing: msg.game ?? null,
+          typingOver: null,
           ready: { host: false, guest: false },
           game: null,
         });
@@ -50,6 +52,23 @@ export class GuestSession extends SessionBase implements OnlineSession {
       case 'state':
         this.stopCountdown();
         this.update({ game: msg.state, countdown: null, phase: msg.state.phase === 'over' ? 'over' : 'playing' });
+        return;
+      case 'typingStart':
+        this.stopCountdown();
+        if (this.snapshot.typing) this.update({ phase: 'playing', countdown: null, typingOver: null });
+        return;
+      case 'typingStatus':
+        if (this.snapshot.phase === 'playing' && this.snapshot.typing) {
+          const { type, ...status } = msg;
+          void type;
+          this.emitTyping({ type: 'status', status });
+        }
+        return;
+      case 'typingAttack':
+        if (this.snapshot.phase === 'playing' && this.snapshot.typing) this.emitTyping({ type: 'attack', count: msg.count });
+        return;
+      case 'typingOver':
+        if (this.snapshot.typing) this.update({ phase: 'over', typingOver: { winner: msg.winner, reason: msg.reason } });
         return;
       case 'leave':
         this.opponentGone();
@@ -71,5 +90,15 @@ export class GuestSession extends SessionBase implements OnlineSession {
 
   skipReveal(): void {
     // The host paces the match.
+  }
+
+  /** A request: the host checks and rate-limits it before applying it to its own field. */
+  sendTypingAttack(count: number): void {
+    if (this.snapshot.phase !== 'playing' || !this.snapshot.typing) return;
+    this.transport.send({ type: 'typingAttack', count: count >= 2 ? 2 : 1 });
+  }
+
+  reportTypingDone(reason: 'dead' | 'race', milestone: number): void {
+    if (this.snapshot.phase === 'playing' && this.snapshot.typing) this.transport.send({ type: 'typingDone', reason, milestone });
   }
 }

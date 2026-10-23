@@ -87,6 +87,8 @@ export function TypingPlay({ items, content, seed, rule, mode, botLevel, remote,
     if (finished.current || !fieldRef.current) return;
     finished.current = true;
     loopRef.current?.stop();
+    // Leaving an online match counts as losing; the host announces it to both sides.
+    if (remote && result === 'quit') remote.reportDone('dead', fieldRef.current.milestone);
     loopRef.current?.pushHud();
     onFinish(summarize(fieldRef.current, { result, reason, content, mode }));
   };
