@@ -1,0 +1,13 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+    "AzureWebJobsStorage": "",
+    "AI_PROVIDER": "openai",
+    "AI_MODEL": "gpt-6-luna",
+    "OPENAI_API_KEY": "",
+    "ANTHROPIC_API_KEY": "",
+    "AI_PRICE_INPUT_PER_MTOK": "0.10",
+    "AI_PRICE_OUTPUT_PER_MTOK": "0.50"
+  }
+}
