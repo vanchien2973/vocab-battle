@@ -38,10 +38,13 @@ public sealed class StructuredService(IAiProvider provider)
     }
 
     /// <summary>Run one structured call; when the output fails to parse or validate, retry once.</summary>
-    public async Task<StructuredResult> RunAsync(string system, string user, string schemaName, int maxTokens, CancellationToken ct)
+    /// <param name="overrides">Optional model/effort/temperature for this call (VSTEP grading).</param>
+    public async Task<StructuredResult> RunAsync(
+        string system, string user, string schemaName, int maxTokens, CancellationToken ct, Func<StructuredRequest, StructuredRequest>? overrides = null)
     {
         var schema = AiShared.Schema(schemaName);
         var request = new StructuredRequest(system, user, schemaName.Replace('-', '_'), AiShared.SchemaNode(schemaName), maxTokens);
+        if (overrides is not null) request = overrides(request);
         var usage = AiUsage.Zero;
         string? error = null;
         for (var attempt = 1; attempt <= MaxAttempts; attempt++)

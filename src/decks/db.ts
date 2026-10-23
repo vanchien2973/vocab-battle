@@ -1,5 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type { DeckProgress, ProgressBatch } from '../study/fsrs';
+import type { WritingDraft } from '../vstep/drafts';
+import type { WritingRecord, WritingStats } from '../vstep/types';
 import { migrateDeck } from './migrate';
 import type { Deck } from './types';
 
@@ -23,6 +25,9 @@ export class VocabDb extends Dexie {
   decks!: Table<Deck, string>;
   progress!: Table<DeckProgress, string>;
   pending!: Table<PendingBatch, number>;
+  writings!: Table<WritingRecord, string>;
+  writingDrafts!: Table<WritingDraft, string>;
+  writingStats!: Table<WritingStats & { id: string }, string>;
 
   constructor(name = DB_NAME) {
     super(name);
@@ -39,6 +44,8 @@ export class VocabDb extends Dexie {
             Object.assign(deck, migrated);
           }),
       );
+    // v3: VSTEP writing history, the current draft and error totals (signed-out players).
+    this.version(3).stores({ writings: 'id, createdAt, promptId', writingDrafts: 'id', writingStats: 'id' });
   }
 }
 

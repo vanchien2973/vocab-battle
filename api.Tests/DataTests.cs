@@ -68,7 +68,7 @@ public class DataTests
     private readonly FakeTimeProvider _time = new(new DateTimeOffset(2026, 10, 23, 8, 0, 0, TimeSpan.Zero));
     private readonly CancellationToken _ct = CancellationToken.None;
 
-    private DataStores Stores => new(_decks, _progress, _shares);
+    private DataStores Stores => new(_decks, _progress, _shares, new InMemoryStore());
     private DeckService Decks => new(Stores, _time);
     private ProgressService Progress => new(Stores, _time);
     private ShareService Shares => new(Stores, _time);

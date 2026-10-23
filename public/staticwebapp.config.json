@@ -46,6 +46,37 @@
       ]
     },
     {
+      "route": "/api/writing/generate-prompt",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "route": "/api/writing/grade",
+      "methods": [
+        "POST"
+      ]
+    },
+    {
+      "route": "/api/writings",
+      "methods": [
+        "GET"
+      ],
+      "allowedRoles": [
+        "authenticated"
+      ]
+    },
+    {
+      "route": "/api/writings/*",
+      "methods": [
+        "GET",
+        "DELETE"
+      ],
+      "allowedRoles": [
+        "authenticated"
+      ]
+    },
+    {
       "route": "/api/decks",
       "methods": [
         "GET",

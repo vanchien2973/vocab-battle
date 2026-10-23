@@ -1,0 +1,52 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rewrite",
+    "usefulPhrases"
+  ],
+  "properties": {
+    "rewrite": {
+      "type": "string",
+      "description": "The model answer, paragraphs separated by blank lines."
+    },
+    "usefulPhrases": {
+      "type": "array",
+      "description": "6-12 useful expressions taken from the rewrite.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "type",
+          "meaningVi",
+          "example"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Dictionary form, e.g. \"have a detrimental effect on\"."
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "word",
+              "collocation",
+              "phrasal_verb",
+              "idiom",
+              "pattern"
+            ]
+          },
+          "meaningVi": {
+            "type": "string",
+            "description": "Short Vietnamese meaning."
+          },
+          "example": {
+            "type": "string",
+            "description": "The sentence of the rewrite that uses it."
+          }
+        }
+      }
+    }
+  }
+}

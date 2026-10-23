@@ -10,9 +10,10 @@ interface Props {
   onDecks: () => void;
   onStudy: () => void;
   onTyping: () => void;
+  onWriting: () => void;
 }
 
-export function Menu({ onOffline, onOnline, onDecks, onStudy, onTyping }: Props) {
+export function Menu({ onOffline, onOnline, onDecks, onStudy, onTyping, onWriting }: Props) {
   const [mode, setMode] = useState<'local' | 'bot' | null>(null);
   const [name, setName] = useState(loadName);
   const [name2, setName2] = useState('');
@@ -44,9 +45,14 @@ export function Menu({ onOffline, onOnline, onDecks, onStudy, onTyping }: Props)
           <button type="button" className="btn big primary" onClick={onOnline}>
             🌐 Online 1v1
           </button>
-          <button type="button" className="btn big" onClick={onTyping}>
-            ⌨️ Luyện Gõ
-          </button>
+          <div className="menu-row">
+            <button type="button" className="btn big" onClick={onTyping}>
+              ⌨️ Luyện Gõ
+            </button>
+            <button type="button" className="btn big" onClick={onWriting}>
+              ✍️ Luyện Writing
+            </button>
+          </div>
           <div className="menu-row">
             <button type="button" className="btn big" onClick={onDecks}>
               📚 Bộ từ của tôi

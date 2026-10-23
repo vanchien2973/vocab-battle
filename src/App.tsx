@@ -16,6 +16,7 @@ const DecksPage = lazy(() => import('./components/decks/DecksPage').then((m) => 
 const DeckEditor = lazy(() => import('./components/decks/DeckEditor').then((m) => ({ default: m.DeckEditor })));
 const SharedDeckView = lazy(() => import('./components/decks/SharedDeckView').then((m) => ({ default: m.SharedDeckView })));
 const StudyScreen = lazy(() => import('./components/study/StudyScreen').then((m) => ({ default: m.StudyScreen })));
+const WritingScreen = lazy(() => import('./components/writing/WritingScreen').then((m) => ({ default: m.WritingScreen })));
 const TypingGame = lazy(() => import('./components/typing/TypingGame').then((m) => ({ default: m.TypingGame })));
 const SyncPrompt = lazy(() => import('./components/decks/DeckDialogs').then((m) => ({ default: m.SyncPrompt })));
 
@@ -27,7 +28,8 @@ export type Screen =
   | { name: 'deck'; id: string }
   | { name: 'study'; deckIds: string[] | null; items?: BattleItem[]; back: Screen }
   | { name: 'shared'; source: SharedSource }
-  | { name: 'typing' };
+  | { name: 'typing' }
+  | { name: 'writing' };
 
 function initialScreen(): Screen {
   const room = roomFromSearch(window.location.search);
@@ -73,6 +75,9 @@ export default function App() {
         />
       );
       break;
+    case 'writing':
+      content = <WritingScreen onMenu={toMenu} />;
+      break;
     case 'shared':
       content = (
         <SharedDeckView
@@ -96,6 +101,7 @@ export default function App() {
           onDecks={() => setScreen({ name: 'decks' })}
           onStudy={() => setScreen({ name: 'study', deckIds: null, back: { name: 'menu' } })}
           onTyping={() => setScreen({ name: 'typing' })}
+          onWriting={() => setScreen({ name: 'writing' })}
         />
       );
   }

@@ -1,0 +1,17 @@
+[
+  {"text": "", "words": 0},
+  {"text": "   \n\t ", "words": 0},
+  {"text": "Hello world.", "words": 2},
+  {"text": "Hello,world", "words": 1},
+  {"text": "Dear Sir, I am writing to complain.", "words": 7},
+  {"text": "It is a well-known fact.", "words": 5},
+  {"text": "I don't think students' opinions matter.", "words": 6},
+  {"text": "It costs 2,000 dollars, about 3.5% of my salary.", "words": 9},
+  {"text": "Firstly - and most importantly - health.", "words": 5},
+  {"text": "Cities—especially big ones—are noisy.", "words": 6},
+  {"text": "Yours faithfully,\n\nNam", "words": 3},
+  {"text": "\"Quoted\" (words) [here] ... !!!", "words": 3},
+  {"text": "e.g. 24/7 and/or 10:30", "words": 4},
+  {"text": "Tiếng Việt có dấu", "words": 4},
+  {"text": "line one\r\nline two", "words": 4}
+]

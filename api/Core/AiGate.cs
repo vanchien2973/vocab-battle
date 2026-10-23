@@ -30,9 +30,10 @@ public sealed class AiGate(AiOptions options, IpRateLimiter limiter, UsageTracke
     }
 
     /// <summary>Count tokens and estimated cost for today's usage and log them.</summary>
-    public decimal Record(string endpoint, string model, AiUsage tokens)
+    /// <param name="priceIn">Per-million-token prices when the call used another model (e.g. grading); default the main prices.</param>
+    public decimal Record(string endpoint, string model, AiUsage tokens, decimal? priceIn = null, decimal? priceOut = null)
     {
-        var cost = CostCalculator.Estimate(tokens, options.PriceInputPerMTok, options.PriceOutputPerMTok);
+        var cost = CostCalculator.Estimate(tokens, priceIn ?? options.PriceInputPerMTok, priceOut ?? options.PriceOutputPerMTok);
         usage.Record(endpoint, tokens, cost);
         logger.LogInformation(
             "AI {Endpoint} model={Model} input_tokens={Input} output_tokens={Output} est_cost_usd={Cost}",

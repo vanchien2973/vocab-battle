@@ -1,3 +1,5 @@
+import type { PromptRequestInput } from '../vstep/aiTasks';
+import type { GradeInput, GradeResponse, WritingPrompt } from '../vstep/types';
 import type { DistractorInput, DistractorResult, GenerateDeckInput, GeneratedDeck, GeneratedItem } from './tasks';
 
 export const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
@@ -49,6 +51,10 @@ export interface AiClient {
   extractItems(passage: string, level: Cefr, signal?: AbortSignal): Promise<GeneratedItem[]>;
   /** Wrong options for battles, for up to 10 items. */
   generateDistractors(items: DistractorInput[], signal?: AbortSignal): Promise<DistractorResult[]>;
+  /** A new VSTEP writing prompt for a task, topic and level. */
+  generateWritingPrompt(input: PromptRequestInput, signal?: AbortSignal): Promise<WritingPrompt>;
+  /** Grade an essay (scores, errors, rewrite, phrases); signed in, the server also saves it. */
+  gradeWriting(input: GradeInput, signal?: AbortSignal): Promise<GradeResponse>;
 }
 
 export class AiError extends Error {

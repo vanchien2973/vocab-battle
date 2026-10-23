@@ -29,5 +29,5 @@ public interface IDocumentStore
     Task<IReadOnlyList<JsonNode>> QueryAsync(string partitionKey, string sql, IReadOnlyDictionary<string, object> parameters, CancellationToken ct);
 }
 
-/// <summary>The three containers of the "vocabbattle" database.</summary>
-public sealed record DataStores(IDocumentStore Decks, IDocumentStore Progress, IDocumentStore Shares);
+/// <summary>The containers of the "vocabbattle" database.</summary>
+public sealed record DataStores(IDocumentStore Decks, IDocumentStore Progress, IDocumentStore Shares, IDocumentStore Writings);

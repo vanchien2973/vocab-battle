@@ -1,0 +1,20 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title", "text", "requirements", "register", "essayType"],
+  "properties": {
+    "title": { "type": "string", "description": "Short English title of the prompt (max 10 words), e.g. \"Email to a friend about a summer course\"." },
+    "text": { "type": "string", "description": "The complete task exactly as the candidate reads it, ending with the word requirement." },
+    "requirements": {
+      "type": "array",
+      "description": "Task 1: the 3 points the letter must cover. Task 2: empty array.",
+      "items": { "type": "string" }
+    },
+    "register": { "type": "string", "enum": ["formal", "informal", "semi-formal", ""], "description": "Task 1 register; empty string for Task 2." },
+    "essayType": {
+      "type": "string",
+      "enum": ["opinion", "discussion", "advantages_disadvantages", "problem_solution", ""],
+      "description": "Task 2 essay type; empty string for Task 1."
+    }
+  }
+}

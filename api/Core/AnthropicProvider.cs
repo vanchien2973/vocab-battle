@@ -21,16 +21,17 @@ public sealed class AnthropicProvider(HttpClient http, AiOptions options) : IAiP
     {
         var body = new JsonObject
         {
-            ["model"] = Model,
+            ["model"] = request.Model ?? Model,
             ["max_tokens"] = request.MaxTokens,
             ["system"] = request.System,
             ["messages"] = new JsonArray(Message("user", request.User)),
             ["output_config"] = new JsonObject
             {
-                ["effort"] = Effort,
+                ["effort"] = request.Effort ?? Effort,
                 ["format"] = new JsonObject { ["type"] = "json_schema", ["schema"] = request.Schema.DeepClone() },
             },
         };
+        if (request.Temperature is { } temperature) body["temperature"] = temperature;
 
         using var res = await SendAsync(body, ct);
         var doc = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));

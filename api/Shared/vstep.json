@@ -1,0 +1,80 @@
+{
+  "tasks": {
+    "1": { "kind": "letter", "label": "Task 1 · Thư/Email", "minWords": 120, "minutes": 20 },
+    "2": { "kind": "essay", "label": "Task 2 · Bài luận", "minWords": 250, "minutes": 40 }
+  },
+  "examMinutes": 60,
+  "maxWords": 600,
+  "maxPromptLength": 2000,
+  "maxTitleLength": 120,
+  "writingWeights": { "task1": 1, "task2": 2 },
+  "roundTo": 0.5,
+  "bands": [
+    { "min": 8.5, "level": "C1", "label": "C1" },
+    { "min": 6, "level": "B2", "label": "B2" },
+    { "min": 4, "level": "B1", "label": "B1" },
+    { "min": 0, "level": "none", "label": "Chưa đạt" }
+  ],
+  "shortEssayCapScale": 10,
+  "warnAtSeconds": [300, 60],
+  "draftSaveSeconds": 5,
+  "targetLevels": ["B1", "B2", "C1"],
+  "criteria": [
+    { "id": "taskFulfilment", "label": "Hoàn thành nhiệm vụ" },
+    { "id": "organization", "label": "Tổ chức bài" },
+    { "id": "vocabulary", "label": "Từ vựng" },
+    { "id": "grammar", "label": "Ngữ pháp" }
+  ],
+  "topics": [
+    { "id": "education", "label": "Giáo dục", "en": "education" },
+    { "id": "environment", "label": "Môi trường", "en": "environment" },
+    { "id": "technology", "label": "Công nghệ", "en": "technology" },
+    { "id": "health", "label": "Sức khoẻ", "en": "health" },
+    { "id": "work", "label": "Công việc", "en": "work and careers" },
+    { "id": "society", "label": "Xã hội", "en": "society and community" },
+    { "id": "travel", "label": "Du lịch", "en": "travel and tourism" },
+    { "id": "family", "label": "Gia đình", "en": "family and relationships" },
+    { "id": "culture", "label": "Văn hoá", "en": "culture and entertainment" },
+    { "id": "city", "label": "Đô thị", "en": "city life and transport" }
+  ],
+  "essayTypes": [
+    { "id": "opinion", "label": "Ý kiến (opinion)" },
+    { "id": "discussion", "label": "Thảo luận hai quan điểm (discussion)" },
+    { "id": "advantages_disadvantages", "label": "Ưu và nhược điểm" },
+    { "id": "problem_solution", "label": "Vấn đề và giải pháp" }
+  ],
+  "errorCategories": [
+    { "id": "grammar", "label": "Ngữ pháp" },
+    { "id": "vocabulary", "label": "Từ vựng" },
+    { "id": "spelling", "label": "Chính tả" },
+    { "id": "punctuation", "label": "Dấu câu" },
+    { "id": "coherence", "label": "Mạch lạc" },
+    { "id": "task", "label": "Yêu cầu đề" },
+    { "id": "register", "label": "Văn phong" }
+  ],
+  "errorRules": [
+    { "id": "verb_tense", "label": "Thì của động từ" },
+    { "id": "subject_verb", "label": "Hoà hợp chủ ngữ – động từ" },
+    { "id": "article", "label": "Mạo từ" },
+    { "id": "preposition", "label": "Giới từ" },
+    { "id": "plural", "label": "Số ít/số nhiều" },
+    { "id": "word_form", "label": "Từ loại" },
+    { "id": "word_order", "label": "Trật tự từ" },
+    { "id": "sentence_structure", "label": "Cấu trúc câu" },
+    { "id": "collocation", "label": "Kết hợp từ" },
+    { "id": "word_choice", "label": "Chọn từ" },
+    { "id": "spelling", "label": "Chính tả" },
+    { "id": "punctuation", "label": "Dấu câu" },
+    { "id": "linking", "label": "Từ nối" },
+    { "id": "register", "label": "Văn phong" },
+    { "id": "content", "label": "Nội dung" },
+    { "id": "other", "label": "Khác" }
+  ],
+  "maxErrors": 40,
+  "maxListItems": 3,
+  "maxEvidence": 3,
+  "maxPhrases": 12,
+  "maxAvoid": 10,
+  "historyLimit": 300,
+  "recentPromptsKept": 30
+}

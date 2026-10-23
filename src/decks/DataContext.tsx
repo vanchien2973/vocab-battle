@@ -3,6 +3,8 @@ import { fetchMe, type AuthUser } from '../auth/auth';
 import { readJSON, writeJSON } from '../storage/safeStorage';
 import { emptyProgress, type DeckProgress } from '../study/fsrs';
 import { MemoryPendingStore, ProgressQueue, type PendingStore } from '../study/progressQueue';
+import { DexieDraftStore, MemoryDraftStore, type DraftStore } from '../vstep/drafts';
+import { CloudWritingRepository, LocalWritingRepository, MemoryWritingRepository, type WritingRepository } from '../vstep/repository';
 import { DexiePendingStore, getDb } from './db';
 import { takeLegacyMyWords } from './migrate';
 import {
@@ -22,6 +24,7 @@ import { newDeck, type Deck, type DeckSummary } from './types';
 interface Repos {
   decks: DeckRepository;
   progress: ProgressRepository;
+  writings: WritingRepository;
 }
 
 interface DataApi {
@@ -42,6 +45,9 @@ interface DataApi {
   importDeck: (deck: Deck) => Promise<Deck>;
   loadProgress: (deckId: string) => Promise<DeckProgress>;
   queue: ProgressQueue;
+  /** VSTEP writing history (cloud when signed in) and this device's draft. */
+  writings: WritingRepository;
+  drafts: DraftStore;
   /** Local decks to offer syncing after the first sign-in (null when nothing to ask); cleared by declineSync. */
   syncOffer: number | null;
   acceptSync: () => Promise<SyncResult>;
@@ -51,10 +57,26 @@ interface DataApi {
 const Ctx = createContext<DataApi | null>(null);
 const SYNC_ASKED_KEY = 'vocab-battle.syncAsked.v1';
 
-function localRepos(): Repos & { pending: PendingStore; kind: 'local' | 'memory' } {
+function localRepos(): Repos & { pending: PendingStore; drafts: DraftStore; kind: 'local' | 'memory' } {
   const db = getDb();
-  if (db) return { decks: new LocalDeckRepository(db), progress: new LocalProgressRepository(db), pending: new DexiePendingStore(db), kind: 'local' };
-  return { decks: new MemoryDeckRepository(), progress: new MemoryProgressRepository(), pending: new MemoryPendingStore(), kind: 'memory' };
+  if (db) {
+    return {
+      decks: new LocalDeckRepository(db),
+      progress: new LocalProgressRepository(db),
+      writings: new LocalWritingRepository(db),
+      pending: new DexiePendingStore(db),
+      drafts: new DexieDraftStore(db),
+      kind: 'local',
+    };
+  }
+  return {
+    decks: new MemoryDeckRepository(),
+    progress: new MemoryProgressRepository(),
+    writings: new MemoryWritingRepository(),
+    pending: new MemoryPendingStore(),
+    drafts: new MemoryDraftStore(),
+    kind: 'memory',
+  };
 }
 
 let legacyOnce: Promise<void> | null = null;
@@ -89,7 +111,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const cache = useRef(new Map<string, Deck>());
 
   const repos: Repos = useMemo(
-    () => (user && cloudReady ? { decks: new CloudDeckRepository(), progress: new CloudProgressRepository() } : local),
+    () => (user && cloudReady ? { decks: new CloudDeckRepository(), progress: new CloudProgressRepository(), writings: new CloudWritingRepository() } : local),
     [user, cloudReady, local],
   );
   const cloud = user && cloudReady;
@@ -205,6 +227,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       }
     },
     queue,
+    writings: repos.writings,
+    drafts: local.drafts,
     syncOffer,
     acceptSync: async () => {
       const result = await syncLocalToCloud(local.decks, local.progress, repos.decks, repos.progress);

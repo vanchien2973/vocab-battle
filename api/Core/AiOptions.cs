@@ -21,6 +21,19 @@ public sealed record AiOptions
     /// Off by default: SWA managed functions buffer the whole response (measured 2026-10-23), so SSE brings no benefit.
     /// </summary>
     public bool ChatStreaming { get; init; }
+    /// <summary>VSTEP grading model (defaults to <see cref="Model"/>); may be a stronger model than lookups use.</summary>
+    public string? GradingModel { get; init; }
+    public string? GradingEffort { get; init; }
+    /// <summary>Only sent when set: Claude and OpenAI reasoning models reject sampling parameters.</summary>
+    public double? GradingTemperature { get; init; }
+    public int GradingMaxTokens { get; init; } = 6000;
+    /// <summary>Prices of the grading model; default to the main model's prices.</summary>
+    public decimal? GradingPriceInputPerMTok { get; init; }
+    public decimal? GradingPriceOutputPerMTok { get; init; }
+    /// <summary>Gradings per signed-in user per UTC day.</summary>
+    public int WritingGradePerDay { get; init; } = 10;
+    /// <summary>Gradings per IP per UTC day when not signed in.</summary>
+    public int WritingGradePerDayAnon { get; init; } = 3;
     public decimal? DailyBudgetUsd { get; init; }
     public int LookupPerMinute { get; init; } = 20;
     public int ChatPerMinute { get; init; } = 10;
@@ -29,6 +42,8 @@ public sealed record AiOptions
     public int PerIpPerDay { get; init; } = 300;
     public string OpenAiBaseUrl { get; init; } = "https://api.openai.com/";
     public string AnthropicBaseUrl { get; init; } = "https://api.anthropic.com/";
+
+    public string EffectiveGradingModel => GradingModel ?? Model ?? "";
 
     public string ApiKey => Provider == "anthropic" ? AnthropicApiKey ?? "" : OpenAiApiKey ?? "";
 
@@ -62,6 +77,14 @@ public sealed record AiOptions
             ChatMaxTokens = Int("AI_CHAT_MAX_TOKENS", d.ChatMaxTokens),
             GenerateMaxTokens = Int("AI_GENERATE_MAX_TOKENS", d.GenerateMaxTokens),
             ChatStreaming = string.Equals(Str("CHAT_STREAMING"), "true", StringComparison.OrdinalIgnoreCase),
+            GradingModel = Str("AI_GRADING_MODEL"),
+            GradingEffort = Str("AI_GRADING_EFFORT"),
+            GradingTemperature = double.TryParse(Str("AI_GRADING_TEMPERATURE"), NumberStyles.Float, CultureInfo.InvariantCulture, out var temp) ? temp : null,
+            GradingMaxTokens = Int("AI_GRADING_MAX_TOKENS", d.GradingMaxTokens),
+            GradingPriceInputPerMTok = Str("AI_GRADING_PRICE_INPUT_PER_MTOK") is null ? null : Dec("AI_GRADING_PRICE_INPUT_PER_MTOK", 0),
+            GradingPriceOutputPerMTok = Str("AI_GRADING_PRICE_OUTPUT_PER_MTOK") is null ? null : Dec("AI_GRADING_PRICE_OUTPUT_PER_MTOK", 0),
+            WritingGradePerDay = Int("RATE_WRITING_GRADE_PER_DAY", d.WritingGradePerDay),
+            WritingGradePerDayAnon = Int("RATE_WRITING_GRADE_PER_DAY_ANON", d.WritingGradePerDayAnon),
             DailyBudgetUsd = Str("AI_DAILY_BUDGET_USD") is null ? null : Dec("AI_DAILY_BUDGET_USD", 0),
             LookupPerMinute = Int("RATE_LOOKUP_PER_MINUTE", d.LookupPerMinute),
             ChatPerMinute = Int("RATE_CHAT_PER_MINUTE", d.ChatPerMinute),

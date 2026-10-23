@@ -6,6 +6,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using VocabBattle.Api.Core;
 using VocabBattle.Api.Core.Data;
+using VocabBattle.Api.Core.Writing;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 builder.ConfigureFunctionsWebApplication();
@@ -21,6 +22,7 @@ builder.Services.AddSingleton<IAiProvider>(sp =>
 builder.Services.AddSingleton<StructuredService>();
 builder.Services.AddSingleton<LookupService>();
 builder.Services.AddSingleton<AiTasksService>();
+builder.Services.AddSingleton<WritingService>();
 
 // Cosmos DB: one CosmosClient for the app's lifetime. Without COSMOS_CONNECTION_STRING the data endpoints answer 503.
 builder.Services.AddSingleton(_ => DataOptions.FromEnvironment());
@@ -42,16 +44,18 @@ builder.Services.AddSingleton(sp =>
     if (!options.Configured)
     {
         var none = new UnavailableStore();
-        return new DataStores(none, none, none);
+        return new DataStores(none, none, none, none);
     }
     var db = sp.GetRequiredService<CosmosClient>().GetDatabase(options.DatabaseName);
     var usage = sp.GetRequiredService<UsageTracker>();
     var logger = sp.GetRequiredService<ILoggerFactory>().CreateLogger("Cosmos");
     IDocumentStore Store(string name) => new CosmosDocumentStore(db.GetContainer(name), usage, logger);
-    return new DataStores(Store("decks"), Store("progress"), Store("shares"));
+    return new DataStores(Store("decks"), Store("progress"), Store("shares"), Store("writings"));
 });
 builder.Services.AddSingleton<DeckService>();
 builder.Services.AddSingleton<ProgressService>();
 builder.Services.AddSingleton<ShareService>();
+builder.Services.AddSingleton<WritingStore>();
+builder.Services.AddSingleton<WritingQuota>();
 
 builder.Build().Run();

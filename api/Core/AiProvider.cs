@@ -10,8 +10,16 @@ public sealed record AiUsage(int InputTokens, int OutputTokens)
 
 public sealed record ChatMessage(string Role, string Content);
 
-/// <summary>One structured-output call: fixed server-side prompts and a JSON schema the reply must match.</summary>
-public sealed record StructuredRequest(string System, string User, string SchemaName, JsonNode Schema, int MaxTokens);
+/// <summary>
+/// One structured-output call: fixed server-side prompts and a JSON schema the reply must match.
+/// Model/Effort/Temperature override the provider defaults (VSTEP grading uses its own model).
+/// </summary>
+public sealed record StructuredRequest(string System, string User, string SchemaName, JsonNode Schema, int MaxTokens)
+{
+    public string? Model { get; init; }
+    public string? Effort { get; init; }
+    public double? Temperature { get; init; }
+}
 
 /// <summary>Raw structured-output text from the provider; validated by <see cref="StructuredService"/>.</summary>
 public sealed record StructuredRaw(string Json, AiUsage Usage);

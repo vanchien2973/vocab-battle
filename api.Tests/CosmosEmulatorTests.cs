@@ -41,7 +41,8 @@ public class CosmosEmulatorTests
                 await db.CreateContainerAsync(new ContainerProperties(name, pk), cancellationToken: ct);
                 return new CosmosDocumentStore(db.GetContainer(name), usage, NullLogger.Instance);
             }
-            var stores = new DataStores(await Container("decks", "/userId"), await Container("progress", "/userId"), await Container("shares", "/code"));
+            var stores = new DataStores(await Container("decks", "/userId"), await Container("progress", "/userId"), await Container("shares", "/code"),
+                await Container("writings", "/userId"));
             var decks = new DeckService(stores, TimeProvider.System);
 
             var body = JsonNode.Parse("""

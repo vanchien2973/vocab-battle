@@ -24,6 +24,9 @@ import {
   type GeneratedItem,
   type StructuredRequest,
 } from './tasks';
+import { checkPromptInput, cleanPrompt, gradeRequests, writingPromptRequest, type PromptRequestInput } from '../vstep/aiTasks';
+import { buildGradeResult } from '../vstep/scoring';
+import type { GradeInput, GradeResponse, WritingPrompt } from '../vstep/types';
 import { AiError, type AiClient, type Cefr, type ChatRequest, type LookupEntry } from './types';
 
 // Same defaults as the server (AI_LOOKUP_MAX_TOKENS / AI_CHAT_MAX_TOKENS).
@@ -75,6 +78,23 @@ export class DirectAiClient implements AiClient {
     const req = distractorsRequest(items);
     const raw = await this.structured(req, (t) => parseStructured<{ results: unknown }>('distractors', req.schema, t), signal);
     return cleanDistractors(raw.results, checkDistractorItems(items));
+  }
+
+  async generateWritingPrompt(input: PromptRequestInput, signal?: AbortSignal): Promise<WritingPrompt> {
+    const checked = checkPromptInput(input);
+    const req = writingPromptRequest(checked);
+    const raw = await this.structured(req, (t) => parseStructured<Record<string, unknown>>(req.schemaName, req.schema, t), signal);
+    return cleanPrompt(raw, checked);
+  }
+
+  /** Grading and rewrite run in parallel; a failed rewrite still returns the scores. */
+  async gradeWriting(input: GradeInput, signal?: AbortSignal): Promise<GradeResponse> {
+    const { grade, rewrite, wordCount } = gradeRequests(input);
+    const parse = (req: StructuredRequest) => (t: string) => parseStructured<Record<string, unknown>>(req.schemaName, req.schema, t);
+    const [g, r] = await Promise.allSettled([this.structured(grade, parse(grade), signal), this.structured(rewrite, parse(rewrite), signal)]);
+    if (g.status === 'rejected') throw g.reason;
+    const result = buildGradeResult(g.value, r.status === 'fulfilled' ? r.value : null, { task: input.task, level: input.level, wordCount, model: this.settings.model }, r.status === 'rejected' ? (r.reason as Error).message : undefined);
+    return { result };
   }
 
   /** Same policy as the server: retry once when the output does not match the schema. */

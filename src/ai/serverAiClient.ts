@@ -17,6 +17,8 @@ import {
   type GeneratedDeck,
   type GeneratedItem,
 } from './tasks';
+import { checkGradeInput, checkPromptInput, cleanPrompt, type PromptRequestInput } from '../vstep/aiTasks';
+import type { GradeInput, GradeResponse, WritingPrompt } from '../vstep/types';
 import { AiError, type AiClient, type Cefr, type ChatRequest, type LookupEntry } from './types';
 
 async function post(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
@@ -112,5 +114,20 @@ export class ServerAiClient implements AiClient {
     const checked = checkDistractorItems(items);
     const res = await post('/api/generate-distractors', { items: checked }, signal);
     return cleanDistractors(((await res.json()) as { results?: unknown }).results, checked);
+  }
+
+  async generateWritingPrompt(input: PromptRequestInput, signal?: AbortSignal): Promise<WritingPrompt> {
+    const checked = checkPromptInput(input);
+    const res = await post('/api/writing/generate-prompt', checked, signal);
+    return cleanPrompt((await res.json()) as Record<string, unknown>, checked);
+  }
+
+  async gradeWriting(input: GradeInput, signal?: AbortSignal): Promise<GradeResponse> {
+    const { wordCount: _, ...checked } = checkGradeInput(input);
+    void _;
+    const res = await post('/api/writing/grade', checked, signal);
+    const data = (await res.json()) as GradeResponse;
+    if (!data?.result?.criteria) throw new AiError('Máy chủ trả về kết quả chấm không hợp lệ.');
+    return data;
   }
 }

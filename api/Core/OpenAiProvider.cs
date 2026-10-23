@@ -16,11 +16,11 @@ public sealed class OpenAiProvider(HttpClient http, AiOptions options) : IAiProv
     {
         var body = new JsonObject
         {
-            ["model"] = Model,
+            ["model"] = request.Model ?? Model,
             ["instructions"] = request.System,
             ["input"] = new JsonArray(Message("user", request.User)),
             ["max_output_tokens"] = request.MaxTokens,
-            ["reasoning"] = new JsonObject { ["effort"] = Effort },
+            ["reasoning"] = new JsonObject { ["effort"] = request.Effort ?? Effort },
             ["text"] = new JsonObject
             {
                 ["format"] = new JsonObject
@@ -33,6 +33,7 @@ public sealed class OpenAiProvider(HttpClient http, AiOptions options) : IAiProv
             },
             ["store"] = false,
         };
+        if (request.Temperature is { } temperature) body["temperature"] = temperature;
 
         using var res = await SendAsync(body, ct);
         var doc = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
