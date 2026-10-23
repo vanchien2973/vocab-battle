@@ -102,17 +102,11 @@ Workflow `.github/workflows/azure-static-web-apps.yml` chạy khi push vào `mai
 
 > Dùng .NET 10 vì theo [bảng runtime của SWA](https://learn.microsoft.com/azure/static-web-apps/languages-runtimes), `dotnet-isolated:8.0` hết hỗ trợ ngày 10/11/2026.
 
-Thiết lập một lần:
+Thiết lập một lần (trên web):
 
-```bash
-az group create -n rg-vocab-battle -l eastasia
-az staticwebapp create -n vocab-battle -g rg-vocab-battle -l eastasia --sku Free
-az staticwebapp secrets list -n vocab-battle -g rg-vocab-battle --query properties.apiKey -o tsv \
-  | gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN
-az staticwebapp appsettings set -n vocab-battle -g rg-vocab-battle --setting-names \
-  AI_PROVIDER=openai AI_MODEL=gpt-6-luna OPENAI_API_KEY=<key> \
-  AI_PRICE_INPUT_PER_MTOK=0.10 AI_PRICE_OUTPUT_PER_MTOK=0.50
-```
+1. **Azure Portal → Static Web Apps → Create**: Plan **Free**, region East Asia, **Deployment source: Other** (repo đã có workflow riêng).
+2. **Overview → Manage deployment token**, copy token rồi thêm vào **GitHub → Settings → Secrets and variables → Actions** với tên `AZURE_STATIC_WEB_APPS_API_TOKEN`.
+3. **Settings → Environment variables** (tab Production): thêm `AI_PROVIDER`, `AI_MODEL`, `OPENAI_API_KEY`, `AI_PRICE_INPUT_PER_MTOK`, `AI_PRICE_OUTPUT_PER_MTOK` (xem bảng ở trên) rồi bấm **Apply**.
 
 ## Kiến trúc
 
