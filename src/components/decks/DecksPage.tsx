@@ -72,6 +72,7 @@ export function DecksPage({ onOpen, onStudy, onBack }: Props) {
         </span>
       </header>
 
+      {data.user && data.storage !== 'cloud' && <p className="notice">Máy chủ chưa bật lưu trữ tài khoản, bộ từ tạm lưu trên máy này.</p>}
       {!data.user && !data.authLoading && (
         <p className="notice">
           Chưa đăng nhập: bộ từ chỉ lưu trên máy này. Đăng nhập bằng{' '}

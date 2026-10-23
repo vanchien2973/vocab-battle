@@ -291,7 +291,7 @@ export function ShareDialog({ deck, onClose }: { deck: Deck; onClose: () => void
     setBusy(true);
     setNote(null);
     try {
-      if (data.user) {
+      if (data.storage === 'cloud') {
         const { code, expiresAt } = await createShareCode(deck.id);
         setLink(shareCodeLink(code));
         setNote(`Mã ${code} dùng được đến ${new Date(expiresAt).toLocaleDateString('vi-VN')}.`);
@@ -322,7 +322,7 @@ export function ShareDialog({ deck, onClose }: { deck: Deck; onClose: () => void
     <Sheet title={`🔗 Chia sẻ "${deck.name}"`} onClose={onClose}>
       <div className="sheet-body form-grid">
         <p className="muted small">
-          {data.user ? 'Tạo mã 8 ký tự (hiệu lực 30 ngày). Ai có link đều xem và lưu được bộ này.' : 'Chưa đăng nhập: toàn bộ từ được nén vào link.'}
+          {data.storage === 'cloud' ? 'Tạo mã 8 ký tự (hiệu lực 30 ngày). Ai có link đều xem và lưu được bộ này.' : 'Bộ đang lưu trên máy: toàn bộ từ được nén vào link.'}
         </p>
         <button type="button" className="btn primary" disabled={busy} onClick={() => void make()}>
           {busy ? '⏳ Đang tạo…' : link ? 'Tạo lại link' : 'Tạo link chia sẻ'}

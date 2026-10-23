@@ -8,6 +8,7 @@ import { takeLegacyMyWords } from './migrate';
 import {
   CloudDeckRepository,
   CloudProgressRepository,
+  DeckError,
   LocalDeckRepository,
   LocalProgressRepository,
   MemoryDeckRepository,
@@ -82,24 +83,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [summaries, setSummaries] = useState<DeckSummary[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [syncOffer, setSyncOffer] = useState<number | null>(null);
+  /** False when signed in but the server has no database configured (API answers 503). */
+  const [cloudReady, setCloudReady] = useState(false);
   const local = useMemo(localRepos, []);
   const cache = useRef(new Map<string, Deck>());
 
   const repos: Repos = useMemo(
-    () => (user ? { decks: new CloudDeckRepository(), progress: new CloudProgressRepository() } : local),
-    [user, local],
+    () => (user && cloudReady ? { decks: new CloudDeckRepository(), progress: new CloudProgressRepository() } : local),
+    [user, cloudReady, local],
   );
-  const queue = useMemo(() => new ProgressQueue(repos.progress, local.pending, user?.userId ?? ''), [repos, local, user]);
+  const cloud = user && cloudReady;
+  const queue = useMemo(() => new ProgressQueue(repos.progress, local.pending, cloud ? user.userId : ''), [repos, local, user, cloud]);
 
   useEffect(() => {
     let alive = true;
     void (async () => {
       await migrateLegacy(local.decks);
       const me = await fetchMe();
+      // Signed in but no database on the server yet (503): keep using this device's storage.
+      const ready = me ? await cloudAvailable() : false;
       if (!alive) return;
       setUser(me);
+      setCloudReady(ready);
       setAuthLoading(false);
-      if (me) {
+      if (me && ready) {
         const asked = readJSON<string[]>(SYNC_ASKED_KEY, []);
         const n = (await local.decks.list()).length;
         if (n > 0 && !asked.includes(me.userId)) setSyncOffer(n);
@@ -162,7 +169,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const api: DataApi = {
     user,
     authLoading,
-    storage: user ? 'cloud' : local.kind,
+    storage: cloud ? 'cloud' : local.kind,
     summaries,
     listError,
     refresh,
@@ -212,6 +219,15 @@ export function DataProvider({ children }: { children: ReactNode }) {
   };
 
   return <Ctx.Provider value={api}>{children}</Ctx.Provider>;
+}
+
+async function cloudAvailable(): Promise<boolean> {
+  try {
+    await new CloudDeckRepository().list();
+    return true;
+  } catch (e) {
+    return !(e instanceof DeckError && (e.status === 503 || e.status === 404));
+  }
 }
 
 function markAsked(user: AuthUser | null) {
