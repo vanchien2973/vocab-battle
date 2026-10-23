@@ -78,7 +78,7 @@ public static class AiProviderFactory
     {
         401 => new($"API key của {provider} không hợp lệ (HTTP 401). Kiểm tra lại key trong Application settings.", 502),
         403 => new($"API key của {provider} không có quyền dùng model hoặc endpoint này (HTTP 403).", 502),
-        404 => new($"{provider} không tìm thấy model đã cấu hình (HTTP 404). Kiểm tra AI_MODEL.", 502),
+        404 => new($"{provider} không tìm thấy model đã cấu hình (HTTP 404). Kiểm tra AI_MODEL (hoặc AI_GRADING_MODEL khi chấm Writing).", 502),
         429 => new($"{provider} đang giới hạn tần suất, thử lại sau ít phút.", 429),
         >= 500 => new($"{provider} đang gặp sự cố, thử lại sau.", 502),
         _ => new($"{provider} từ chối yêu cầu (HTTP {status}).", 502),
