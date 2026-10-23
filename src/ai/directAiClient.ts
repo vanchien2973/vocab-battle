@@ -3,7 +3,28 @@ import type { ByokSettings } from './byok';
 import { prepareChat } from './chatHistory';
 import { lookupSchema, normalizeWord, parseLookup, prompts } from './shared';
 import { readSse } from './sse';
-import { AiError, type AiClient, type ChatRequest, type LookupEntry } from './types';
+import {
+  checkGenerateDeck,
+  cleanDeck,
+  cleanDistractors,
+  cleanItems,
+  distractorsRequest,
+  extractItemsRequest,
+  generateDeckRequest,
+  onlyPhrases,
+  parseStructured,
+  suggestPhrasesRequest,
+  checkDistractorItems,
+  MAX_EXTRACTED,
+  MAX_SUGGESTIONS,
+  type DistractorInput,
+  type DistractorResult,
+  type GenerateDeckInput,
+  type GeneratedDeck,
+  type GeneratedItem,
+  type StructuredRequest,
+} from './tasks';
+import { AiError, type AiClient, type Cefr, type ChatRequest, type LookupEntry } from './types';
 
 // Same defaults as the server (AI_LOOKUP_MAX_TOKENS / AI_CHAT_MAX_TOKENS).
 const LOOKUP_MAX_TOKENS = 1500;
@@ -22,11 +43,46 @@ export class DirectAiClient implements AiClient {
   async lookup(word: string, signal?: AbortSignal): Promise<LookupEntry> {
     const w = normalizeWord(word);
     if (!w) throw new AiError('Từ cần tra phải là chữ cái tiếng Anh, tối đa 40 ký tự.', 400);
-    // Same policy as the server: retry once when the output does not match the schema.
+    const req: StructuredRequest = {
+      system: prompts.lookupSystem,
+      user: prompts.lookupUser.replace('{word}', w),
+      schemaName: 'lookup',
+      schema: lookupSchema,
+      maxTokens: LOOKUP_MAX_TOKENS,
+    };
+    return this.structured(req, parseLookup, signal);
+  }
+
+  async generateDeck(input: GenerateDeckInput, signal?: AbortSignal): Promise<GeneratedDeck> {
+    const req = generateDeckRequest(input);
+    const raw = await this.structured(req, (t) => parseStructured<Record<string, unknown>>('deck', req.schema, t), signal);
+    return cleanDeck(raw, checkGenerateDeck(input));
+  }
+
+  async suggestPhrases(word: string, signal?: AbortSignal): Promise<GeneratedItem[]> {
+    const req = suggestPhrasesRequest(word);
+    const raw = await this.structured(req, (t) => parseStructured<{ items: unknown }>('items', req.schema, t), signal);
+    return cleanItems(raw.items, MAX_SUGGESTIONS, onlyPhrases);
+  }
+
+  async extractItems(passage: string, level: Cefr, signal?: AbortSignal): Promise<GeneratedItem[]> {
+    const req = extractItemsRequest(passage, level);
+    const raw = await this.structured(req, (t) => parseStructured<{ items: unknown }>('items', req.schema, t), signal);
+    return cleanItems(raw.items, MAX_EXTRACTED);
+  }
+
+  async generateDistractors(items: DistractorInput[], signal?: AbortSignal): Promise<DistractorResult[]> {
+    const req = distractorsRequest(items);
+    const raw = await this.structured(req, (t) => parseStructured<{ results: unknown }>('distractors', req.schema, t), signal);
+    return cleanDistractors(raw.results, checkDistractorItems(items));
+  }
+
+  /** Same policy as the server: retry once when the output does not match the schema. */
+  private async structured<T>(req: StructuredRequest, parse: (text: string) => T | null, signal?: AbortSignal): Promise<T> {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const text = this.settings.provider === 'anthropic' ? await this.anthropicLookup(w, signal) : await this.openAiLookup(w, signal);
-      const entry = parseLookup(text);
-      if (entry) return entry;
+      const text = this.settings.provider === 'anthropic' ? await this.anthropicStructured(req, signal) : await this.openAiStructured(req, signal);
+      const value = parse(text);
+      if (value) return value;
     }
     throw new AiError('AI trả về dữ liệu không hợp lệ, thử lại sau.');
   }
@@ -57,13 +113,13 @@ export class DirectAiClient implements AiClient {
     return res;
   }
 
-  private async openAiLookup(word: string, signal?: AbortSignal): Promise<string> {
+  private async openAiStructured(req: StructuredRequest, signal?: AbortSignal): Promise<string> {
     const res = await this.openAi(
       {
-        instructions: prompts.lookupSystem,
-        input: [{ role: 'user', content: prompts.lookupUser.replace('{word}', word) }],
-        max_output_tokens: LOOKUP_MAX_TOKENS,
-        text: { format: { type: 'json_schema', name: 'dictionary_entry', strict: true, schema: lookupSchema } },
+        instructions: req.system,
+        input: [{ role: 'user', content: req.user }],
+        max_output_tokens: req.maxTokens,
+        text: { format: { type: 'json_schema', name: req.schemaName, strict: true, schema: req.schema } },
       },
       signal,
     );
@@ -72,7 +128,7 @@ export class DirectAiClient implements AiClient {
     for (const item of data.output ?? []) {
       if (item.type !== 'message') continue;
       for (const part of item.content ?? []) {
-        if (part.type === 'refusal') throw new AiError('AI từ chối tra từ này.', 422);
+        if (part.type === 'refusal') throw new AiError('AI từ chối yêu cầu này.', 422);
         if (part.type === 'output_text') text += part.text ?? '';
       }
     }
@@ -108,21 +164,21 @@ export class DirectAiClient implements AiClient {
     return this.anthropic;
   }
 
-  private async anthropicLookup(word: string, signal?: AbortSignal): Promise<string> {
+  private async anthropicStructured(req: StructuredRequest, signal?: AbortSignal): Promise<string> {
     const client = await this.client();
     const msg = await withAnthropicErrors(() =>
       client.messages.create(
         {
           model: this.settings.model,
-          max_tokens: LOOKUP_MAX_TOKENS,
-          system: prompts.lookupSystem,
-          messages: [{ role: 'user', content: prompts.lookupUser.replace('{word}', word) }],
-          output_config: { effort: 'low', format: { type: 'json_schema', schema: lookupSchema } },
+          max_tokens: req.maxTokens,
+          system: req.system,
+          messages: [{ role: 'user', content: req.user }],
+          output_config: { effort: 'low', format: { type: 'json_schema', schema: req.schema as Record<string, unknown> } },
         },
         { signal },
       ),
     );
-    if (msg.stop_reason === 'refusal') throw new AiError('AI từ chối tra từ này.', 422);
+    if (msg.stop_reason === 'refusal') throw new AiError('AI từ chối yêu cầu này.', 422);
     // Read blocks by type: the response may start with (empty) thinking blocks.
     return msg.content.map((b) => (b.type === 'text' ? b.text : '')).join('');
   }

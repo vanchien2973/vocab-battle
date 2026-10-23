@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DEFAULT_MODELS, clearByok, loadByok, saveByok, type ByokProvider } from '../../ai/byok';
+import { loadStudyLimits, saveStudyLimits } from '../../study/settings';
 import { useAiUi } from './AiContext';
 import { Sheet } from './Sheet';
 
@@ -17,6 +18,7 @@ export function SettingsDialog() {
   const [model, setModel] = useState(current?.model ?? '');
   const [saved, setSaved] = useState(false);
   const [usage, setUsage] = useState<UsageInfo | 'error' | null>(null);
+  const [limits, setLimits] = useState(loadStudyLimits);
 
   useEffect(() => {
     if (!state.settingsOpen) return;
@@ -26,6 +28,7 @@ export function SettingsDialog() {
     setModel(s?.model ?? '');
     setSaved(false);
     setUsage(null);
+    setLimits(loadStudyLimits());
   }, [state.settingsOpen]);
 
   if (!state.settingsOpen) return null;
@@ -40,8 +43,43 @@ export function SettingsDialog() {
   };
 
   return (
-    <Sheet title="⚙️ Cài đặt AI" onClose={() => close('settings')}>
+    <Sheet title="⚙️ Cài đặt" onClose={() => close('settings')}>
       <div className="sheet-body settings">
+        <section className="card">
+          <h3>🧠 Ôn tập mỗi ngày</h3>
+          <div className="form-grid two">
+            <label>
+              Thẻ mới / ngày
+              <input
+                className="input"
+                type="number"
+                min={0}
+                max={500}
+                value={limits.newPerDay}
+                onChange={(e) => {
+                  const next = { ...limits, newPerDay: Math.max(0, Math.min(500, Number(e.target.value) || 0)) };
+                  setLimits(next);
+                  saveStudyLimits(next);
+                }}
+              />
+            </label>
+            <label>
+              Lượt ôn / ngày
+              <input
+                className="input"
+                type="number"
+                min={1}
+                max={2000}
+                value={limits.reviewsPerDay}
+                onChange={(e) => {
+                  const next = { ...limits, reviewsPerDay: Math.max(1, Math.min(2000, Number(e.target.value) || 1)) };
+                  setLimits(next);
+                  saveStudyLimits(next);
+                }}
+              />
+            </label>
+          </div>
+        </section>
         <p>
           Đang dùng: <strong>{current ? `API key riêng (${current.provider === 'openai' ? 'OpenAI' : 'Anthropic'} · ${current.model})` : 'Máy chủ của Vocab Battle'}</strong>
         </p>

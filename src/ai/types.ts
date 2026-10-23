@@ -1,3 +1,5 @@
+import type { DistractorInput, DistractorResult, GenerateDeckInput, GeneratedDeck, GeneratedItem } from './tasks';
+
 export const CEFR_LEVELS = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2'] as const;
 export type Cefr = (typeof CEFR_LEVELS)[number];
 
@@ -39,6 +41,14 @@ export interface AiClient {
   lookup(word: string, signal?: AbortSignal): Promise<LookupEntry>;
   /** Streams reply text through onDelta (all at once if the transport buffers) and resolves with the full reply. */
   chat(req: ChatRequest, onDelta: (text: string) => void, signal?: AbortSignal): Promise<string>;
+  /** "Tạo bộ bằng AI": topic + level + 10–30 items. */
+  generateDeck(input: GenerateDeckInput, signal?: AbortSignal): Promise<GeneratedDeck>;
+  /** 5–10 collocations / phrasal verbs / idioms containing a word. */
+  suggestPhrases(word: string, signal?: AbortSignal): Promise<GeneratedItem[]>;
+  /** Words and phrases worth learning from an English passage (≤ 2000 characters). */
+  extractItems(passage: string, level: Cefr, signal?: AbortSignal): Promise<GeneratedItem[]>;
+  /** Wrong options for battles, for up to 10 items. */
+  generateDistractors(items: DistractorInput[], signal?: AbortSignal): Promise<DistractorResult[]>;
 }
 
 export class AiError extends Error {

@@ -1,7 +1,23 @@
 import { trimHistory } from './chatHistory';
 import { parseLookup } from './shared';
 import { readSse } from './sse';
-import { AiError, type AiClient, type ChatRequest, type LookupEntry } from './types';
+import {
+  checkDistractorItems,
+  checkGenerateDeck,
+  checkPassage,
+  cleanDeck,
+  cleanDistractors,
+  cleanItems,
+  onlyPhrases,
+  MAX_EXTRACTED,
+  MAX_SUGGESTIONS,
+  type DistractorInput,
+  type DistractorResult,
+  type GenerateDeckInput,
+  type GeneratedDeck,
+  type GeneratedItem,
+} from './tasks';
+import { AiError, type AiClient, type Cefr, type ChatRequest, type LookupEntry } from './types';
 
 async function post(path: string, body: unknown, signal?: AbortSignal): Promise<Response> {
   let res: Response;
@@ -72,5 +88,29 @@ export class ServerAiClient implements AiClient {
     });
     if (error) throw new AiError(error);
     return reply;
+  }
+
+  // The server validates and cleans these; the client cleans again so a bad response can't break a deck.
+
+  async generateDeck(input: GenerateDeckInput, signal?: AbortSignal): Promise<GeneratedDeck> {
+    const checked = checkGenerateDeck(input);
+    const res = await post('/api/generate-deck', checked, signal);
+    return cleanDeck((await res.json()) as Record<string, unknown>, checked);
+  }
+
+  async suggestPhrases(word: string, signal?: AbortSignal): Promise<GeneratedItem[]> {
+    const res = await post('/api/suggest-phrases', { word }, signal);
+    return cleanItems(((await res.json()) as { items?: unknown }).items, MAX_SUGGESTIONS, onlyPhrases);
+  }
+
+  async extractItems(passage: string, level: Cefr, signal?: AbortSignal): Promise<GeneratedItem[]> {
+    const res = await post('/api/extract-items', { passage: checkPassage(passage), level }, signal);
+    return cleanItems(((await res.json()) as { items?: unknown }).items, MAX_EXTRACTED);
+  }
+
+  async generateDistractors(items: DistractorInput[], signal?: AbortSignal): Promise<DistractorResult[]> {
+    const checked = checkDistractorItems(items);
+    const res = await post('/api/generate-distractors', { items: checked }, signal);
+    return cleanDistractors(((await res.json()) as { results?: unknown }).results, checked);
   }
 }

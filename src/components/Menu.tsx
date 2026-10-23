@@ -7,9 +7,11 @@ import type { OfflineConfig } from './OfflineGame';
 interface Props {
   onOffline: (config: OfflineConfig) => void;
   onOnline: () => void;
+  onDecks: () => void;
+  onStudy: () => void;
 }
 
-export function Menu({ onOffline, onOnline }: Props) {
+export function Menu({ onOffline, onOnline, onDecks, onStudy }: Props) {
   const [mode, setMode] = useState<'local' | 'bot' | null>(null);
   const [name, setName] = useState(loadName);
   const [name2, setName2] = useState('');
@@ -41,6 +43,14 @@ export function Menu({ onOffline, onOnline }: Props) {
           <button type="button" className="btn big primary" onClick={onOnline}>
             🌐 Online 1v1
           </button>
+          <div className="menu-row">
+            <button type="button" className="btn big" onClick={onDecks}>
+              📚 Bộ từ của tôi
+            </button>
+            <button type="button" className="btn big" onClick={onStudy}>
+              🧠 Ôn hôm nay
+            </button>
+          </div>
         </div>
       ) : (
         <form

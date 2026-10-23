@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { getAiClient } from '../../ai';
 import { cacheLookup, getCachedLookup } from '../../ai/lookupCache';
-import { addMyWord, hasMyWord, removeMyWord, MY_PREFIX } from '../../ai/myWords';
 import { normalizeWord } from '../../ai/shared';
+import type { GeneratedItem } from '../../ai/tasks';
 import { AiError, type LookupEntry } from '../../ai/types';
+import { itemFromEntry, withIds } from '../../decks/itemTools';
+import { ITEM_TYPE_LABELS, type Item } from '../../decks/types';
+import { AddToDeckDialog } from '../decks/AddToDeckDialog';
+import { ItemPreviewDialog } from '../decks/ItemPreview';
 import { SpeakButton } from '../prepare/SpeakButton';
-import { notifyMyWordsChanged, useAiUi } from './AiContext';
+import { useAiUi } from './AiContext';
 import { Sheet } from './Sheet';
 
 type Status = { kind: 'idle' } | { kind: 'loading' } | { kind: 'error'; message: string } | { kind: 'done'; entry: LookupEntry; cached: boolean };
@@ -33,8 +37,7 @@ export function DictionaryPanel() {
     abort.current = ctrl;
     setStatus({ kind: 'loading' });
     try {
-      const entry = await getAiClient().lookup(word, ctrl.signal);
-      cacheLookup(word, entry);
+      const entry = await lookupCached(word, ctrl.signal);
       if (!ctrl.signal.aborted) setStatus({ kind: 'done', entry, cached: false });
     } catch (e) {
       if (ctrl.signal.aborted) return;
@@ -78,18 +81,55 @@ export function DictionaryPanel() {
   );
 }
 
-function LookupResult({ entry, cached, onLookup }: { entry: LookupEntry; cached: boolean; onLookup: (w: string) => void }) {
-  const [saved, setSaved] = useState(() => hasMyWord(entry.word));
-  useEffect(() => setSaved(hasMyWord(entry.word)), [entry.word]);
+/** Cache-first lookup shared by the panel and the "+" buttons. */
+async function lookupCached(word: string, signal?: AbortSignal): Promise<LookupEntry> {
+  const key = normalizeWord(word) ?? word;
+  const cached = getCachedLookup(key);
+  if (cached) return cached;
+  const entry = await getAiClient().lookup(key, signal);
+  cacheLookup(key, entry);
+  return entry;
+}
 
-  const toggleSave = () => {
-    if (saved) {
-      removeMyWord(MY_PREFIX + normalizeWord(entry.word));
-      setSaved(false);
-    } else {
-      setSaved(!!addMyWord(entry));
+type Adding = { items: Item[]; root?: Item } | null;
+
+function LookupResult({ entry, cached, onLookup }: { entry: LookupEntry; cached: boolean; onLookup: (w: string) => void }) {
+  const [adding, setAdding] = useState<Adding>(null);
+  const [suggested, setSuggested] = useState<GeneratedItem[] | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  useEffect(() => {
+    setNote(null);
+    setSuggested(null);
+  }, [entry.word]);
+  const root = () => itemFromEntry(entry);
+
+  /** "+" on a collocation: look it up (so it gets its own meaning and examples), then add it. */
+  const addPhrase = async (phrase: string) => {
+    setBusy(phrase);
+    setNote(null);
+    try {
+      const e = await lookupCached(phrase);
+      const item = itemFromEntry(e);
+      if (item.type === 'word' && phrase.trim().includes(' ')) item.type = 'collocation';
+      setAdding({ items: [item], root: root() });
+    } catch (err) {
+      setNote(err instanceof AiError ? err.message : 'Không tra được cụm từ này.');
+    } finally {
+      setBusy(null);
     }
-    notifyMyWordsChanged();
+  };
+
+  const suggest = async () => {
+    setBusy('suggest');
+    setNote(null);
+    try {
+      setSuggested(await getAiClient().suggestPhrases(entry.word));
+    } catch (err) {
+      setNote(err instanceof AiError ? err.message : 'Không gợi ý được cụm từ.');
+    } finally {
+      setBusy(null);
+    }
   };
 
   const chips = (title: string, items: string[], clickable = false) =>
@@ -119,11 +159,20 @@ function LookupResult({ entry, cached, onLookup }: { entry: LookupEntry; cached:
         <span className="ipa">{entry.ipa}</span>
         <SpeakButton text={entry.word} />
         <span className={`badge lv-${entry.cefr}`}>{entry.cefr}</span>
+        {entry.itemType && entry.itemType !== 'word' && <span className={`badge type-${entry.itemType}`}>{ITEM_TYPE_LABELS[entry.itemType]}</span>}
         {cached && <span className="muted small">(đã lưu)</span>}
       </div>
-      <button type="button" className={`btn ${saved ? 'ready' : 'primary'} small`} onClick={toggleSave}>
-        {saved ? '✓ Đã có trong "Của tôi" (bấm để bỏ)' : '⭐ Thêm vào bộ từ của tôi'}
-      </button>
+      <div className="actions-row">
+        <button type="button" className="btn primary small" onClick={() => setAdding({ items: [root()] })}>
+          ⭐ Thêm vào bộ từ của tôi
+        </button>
+        {entry.itemType === 'word' && (
+          <button type="button" className="btn small" disabled={busy !== null} onClick={() => void suggest()}>
+            {busy === 'suggest' ? '⏳ Đang gợi ý…' : '💡 Gợi ý cụm từ'}
+          </button>
+        )}
+      </div>
+      {note && <p className="notice">{note}</p>}
 
       <section>
         <h4>Nghĩa</h4>
@@ -153,7 +202,21 @@ function LookupResult({ entry, cached, onLookup }: { entry: LookupEntry; cached:
         </section>
       )}
 
-      {chips('Cụm từ hay đi kèm', entry.collocations)}
+      {entry.collocations.length > 0 && (
+        <section>
+          <h4>Cụm từ hay đi kèm</h4>
+          <div className="chips">
+            {entry.collocations.map((c) => (
+              <span key={c} className="chip static with-add">
+                {c}
+                <button type="button" className="chip-add" aria-label={`Thêm "${c}" thành mục riêng`} title="Thêm thành mục riêng" disabled={busy !== null} onClick={() => void addPhrase(c)}>
+                  {busy === c ? '…' : '+'}
+                </button>
+              </span>
+            ))}
+          </div>
+        </section>
+      )}
       {chips('Đồng nghĩa', entry.synonyms, true)}
       {chips('Trái nghĩa', entry.antonyms, true)}
 
@@ -169,6 +232,29 @@ function LookupResult({ entry, cached, onLookup }: { entry: LookupEntry; cached:
             ))}
           </ul>
         </section>
+      )}
+      {suggested && (
+        <ItemPreviewDialog
+          title={`💡 Cụm từ với “${entry.word}”`}
+          items={suggested}
+          saveLabel="Thêm vào bộ"
+          onClose={() => setSuggested(null)}
+          onSave={(chosen) => {
+            setSuggested(null);
+            setAdding({ items: withIds(chosen), root: root() });
+          }}
+        />
+      )}
+      {adding && (
+        <AddToDeckDialog
+          items={adding.items}
+          root={adding.root}
+          onClose={() => setAdding(null)}
+          onDone={(msg) => {
+            setAdding(null);
+            setNote(msg);
+          }}
+        />
       )}
     </article>
   );
