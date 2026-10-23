@@ -104,7 +104,8 @@ Workflow `.github/workflows/azure-static-web-apps.yml` chạy khi push vào `mai
 
 Thiết lập một lần (trên web):
 
-1. **Azure Portal → Static Web Apps → Create**: Plan **Free**, region East Asia, **Deployment source: Other** (repo đã có workflow riêng).
+1. **Azure Portal → Static Web Apps → Create**: Plan **Free**, **Deployment source: Other** (repo đã có workflow riêng), region **East US 2** (hoặc West Europe / West US 2 / Central US).
+   ⚠️ **Không chọn East Asia**: managed functions khi đó chạy ở Hong Kong, nơi OpenAI và Anthropic không phục vụ (lỗi `unsupported_country_region_territory`, HTTP 403). Region không đổi được sau khi tạo.
 2. **Overview → Manage deployment token**, copy token rồi thêm vào **GitHub → Settings → Secrets and variables → Actions** với tên `AZURE_STATIC_WEB_APPS_API_TOKEN`.
 3. **Settings → Environment variables** (tab Production): thêm `AI_PROVIDER`, `AI_MODEL`, `OPENAI_API_KEY`, `AI_PRICE_INPUT_PER_MTOK`, `AI_PRICE_OUTPUT_PER_MTOK` (xem bảng ở trên) rồi bấm **Apply**.
 
