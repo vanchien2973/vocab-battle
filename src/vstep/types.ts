@@ -60,6 +60,8 @@ export interface GradeResult {
   /** null when the rewrite call failed (rewriteError says why). */
   rewrite: string | null;
   rewriteError?: string;
+  /** Set when the list of mistakes could not be produced in time (scores are still valid). */
+  errorsError?: string;
   usefulPhrases: UsefulPhrase[];
   model: string;
   gradedAt: string;

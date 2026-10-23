@@ -47,7 +47,13 @@ export interface GradeContext {
  * Turn the two validated model outputs into a result: scores clamped, task fulfilment capped for short
  * essays, task score and level computed here (the model's own total is ignored), lists clipped.
  */
-export function buildGradeResult(grade: Record<string, unknown>, rewrite: Record<string, unknown> | null, ctx: GradeContext, rewriteError?: string): GradeResult {
+export function buildGradeResult(
+  grade: Record<string, unknown>,
+  errors: Record<string, unknown> | null,
+  rewrite: Record<string, unknown> | null,
+  ctx: GradeContext,
+  messages: { rewriteError?: string; errorsError?: string } = {},
+): GradeResult {
   const minWords = taskConfig(ctx.task).minWords;
   const rawCriteria = (grade.criteria ?? {}) as Record<string, Record<string, unknown>>;
   const criteria = {} as Record<Criterion, CriterionResult>;
@@ -67,7 +73,7 @@ export function buildGradeResult(grade: Record<string, unknown>, rewrite: Record
     taskScore,
     band: bandOf(taskScore),
     shortPenalty,
-    errors: cleanErrors(grade.errors),
+    errors: errors ? cleanErrors(errors.errors) : [],
     strengths: list(grade.strengths, VSTEP.maxListItems, 400),
     improvements: list(grade.improvements, VSTEP.maxListItems, 400),
     rewrite: rewrite ? clip(rewrite.rewrite, 8000) || null : null,
@@ -75,7 +81,8 @@ export function buildGradeResult(grade: Record<string, unknown>, rewrite: Record
     model: ctx.model,
     gradedAt: (ctx.now ?? new Date()).toISOString(),
   };
-  if (!result.rewrite) result.rewriteError = rewriteError ?? 'Chưa tạo được bản viết lại.';
+  if (!result.rewrite) result.rewriteError = messages.rewriteError ?? 'Chưa tạo được bản viết lại.';
+  if (!errors) result.errorsError = messages.errorsError ?? 'Chưa liệt kê được lỗi chi tiết.';
   return result;
 }
 

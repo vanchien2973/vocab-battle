@@ -11,8 +11,8 @@ public sealed class WritingStoreTests
     private readonly InMemoryStore _writings = new();
     private WritingStore Store => new(new DataStores(new InMemoryStore(), new InMemoryStore(), new InMemoryStore(), _writings), _time);
 
-    private JsonObject Result(string grade) =>
-        WritingService.BuildResult(JsonNode.Parse(grade)!, JsonNode.Parse(WritingGradeTests.Rewrite), 2, "B2", 300, "m", _time.GetUtcNow());
+    private JsonObject Result(string grade, string errors = WritingGradeTests.Errors) =>
+        WritingService.BuildResult(JsonNode.Parse(grade)!, JsonNode.Parse(errors), JsonNode.Parse(WritingGradeTests.Rewrite), 2, "B2", 300, "m", _time.GetUtcNow());
 
     [Fact]
     public async Task Attempts_are_numbered_per_prompt_and_saved_in_the_user_partition()
@@ -70,7 +70,7 @@ public sealed class WritingStoreTests
     {
         var store = Store;
         var a = await store.SaveAsync("alice", WritingGradeTests.Input(), Result(WritingGradeTests.Grade()), default);
-        await store.SaveAsync("alice", WritingGradeTests.Input(), Result("""{"criteria":{},"errors":[]}"""), default);
+        await store.SaveAsync("alice", WritingGradeTests.Input(), Result("""{"criteria":{}}""", WritingGradeTests.NoErrors), default);
 
         await store.DeleteAsync("alice", (string)a["id"]!, default);
         var history = await store.HistoryAsync("alice", default);
@@ -85,7 +85,7 @@ public sealed class WritingStoreTests
     {
         var store = Store;
         var limit = VstepConfig.Current.HistoryLimit;
-        var result = Result("""{"criteria":{},"errors":[]}""");
+        var result = Result("""{"criteria":{}}""", WritingGradeTests.NoErrors);
         for (var i = 0; i < limit + 2; i++) await store.SaveAsync("alice", WritingGradeTests.Input(), result, default);
         var summaries = (await store.HistoryAsync("alice", default))["summaries"]!.AsArray();
         Assert.Equal(limit, summaries.Count);

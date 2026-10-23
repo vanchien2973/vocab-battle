@@ -39,6 +39,28 @@ public sealed class SchemaProvider : IAiProvider
         throw new NotSupportedException();
 }
 
+/// <summary>Like <see cref="SchemaProvider"/>, but the given schemas answer only after a delay (honouring cancellation).</summary>
+public sealed class SlowProvider(TimeSpan delay, params string[] slowSchemas) : IAiProvider
+{
+    private readonly SchemaProvider _inner = new();
+    public string Name => "slow";
+    public string Model => "main-model";
+    public SlowProvider On(string schema, string output)
+    {
+        _inner.On(schema, output);
+        return this;
+    }
+
+    public async Task<StructuredRaw> GenerateJsonAsync(StructuredRequest request, CancellationToken ct)
+    {
+        if (slowSchemas.Contains(request.SchemaName)) await Task.Delay(delay, ct);
+        return await _inner.GenerateJsonAsync(request, ct);
+    }
+
+    public IAsyncEnumerable<ChatEvent> StreamChatAsync(string system, IReadOnlyList<ChatMessage> messages, CancellationToken ct) =>
+        throw new NotSupportedException();
+}
+
 public sealed class WritingGradeTests
 {
     private static string Crit(double score) => $$"""{"score":{{score.ToString(System.Globalization.CultureInfo.InvariantCulture)}},"comment":"Nhận xét cụ thể.","evidence":["He go to school"]}""";
@@ -46,10 +68,15 @@ public sealed class WritingGradeTests
     internal static string Grade(double tf = 7, double org = 6, double voc = 6, double gra = 5.5, double overall = 9.5) => $$"""
     {"criteria":{"taskFulfilment":{{Crit(tf)}},"organization":{{Crit(org)}},"vocabulary":{{Crit(voc)}},"grammar":{{Crit(gra)}}},
      "overallScore":{{overall.ToString(System.Globalization.CultureInfo.InvariantCulture)}},
-     "errors":[{"quote":"He go","occurrence":1,"category":"grammar","rule":"subject_verb","severity":"major","correction":"He goes","explanationVi":"Chủ ngữ số ít."},
-               {"quote":"to school","occurrence":1,"category":"grammar","rule":"article","severity":"minor","correction":"to the school","explanationVi":"x"}],
      "strengths":["a","b","c","d"],"improvements":["e"]}
     """;
+
+    internal const string Errors = """
+    {"errors":[{"quote":"He go","occurrence":1,"category":"grammar","rule":"subject_verb","severity":"major","correction":"He goes","explanationVi":"Chủ ngữ số ít."},
+               {"quote":"to school","occurrence":1,"category":"grammar","rule":"article","severity":"minor","correction":"to the school","explanationVi":"x"}]}
+    """;
+
+    internal const string NoErrors = """{"errors":[]}""";
 
     internal const string Rewrite = """
     {"rewrite":"He goes to school every day.","usefulPhrases":[
@@ -95,7 +122,7 @@ public sealed class WritingGradeTests
     [Fact]
     public async Task Grading_recomputes_the_total_and_uses_the_grading_model()
     {
-        var provider = new SchemaProvider().On("writing_grade", Grade()).On("writing_rewrite", Rewrite);
+        var provider = new SchemaProvider().On("writing_grade", Grade()).On("writing_errors", Errors).On("writing_rewrite", Rewrite);
         var service = new WritingService(new StructuredService(provider), Options);
         var r = await service.GradeAsync(Input(), CancellationToken.None);
 
@@ -106,7 +133,7 @@ public sealed class WritingGradeTests
         Assert.Equal("article", (string?)r.Value["errors"]![1]!["rule"]);
         Assert.Single(r.Value["usefulPhrases"]!.AsArray());
         Assert.Equal("He goes to school every day.", (string?)r.Value["rewrite"]);
-        Assert.Equal(new AiUsage(2000, 1000), r.Usage);
+        Assert.Equal(new AiUsage(3000, 1500), r.Usage);
         Assert.All(provider.Requests, req =>
         {
             Assert.Equal("grading-model", req.Model);
@@ -122,21 +149,21 @@ public sealed class WritingGradeTests
     [Fact]
     public async Task Invalid_output_is_retried_once_then_reported()
     {
-        var retried = new SchemaProvider().On("writing_grade", "{\"criteria\":{}}", Grade()).On("writing_rewrite", Rewrite);
+        var retried = new SchemaProvider().On("writing_grade", "{\"criteria\":{}}", Grade()).On("writing_errors", Errors).On("writing_rewrite", Rewrite);
         var ok = await new WritingService(new StructuredService(retried), Options).GradeAsync(Input(), CancellationToken.None);
         Assert.Equal(6, (double)ok.Value["taskScore"]!);
         Assert.Equal(2, retried.Requests.Count(r => r.SchemaName == "writing_grade"));
 
-        var broken = new SchemaProvider().On("writing_grade", "not json", "{\"overallScore\":5}").On("writing_rewrite", Rewrite);
+        var broken = new SchemaProvider().On("writing_grade", "not json", "{\"overallScore\":5}").On("writing_errors", Errors).On("writing_rewrite", Rewrite);
         var e = await Assert.ThrowsAsync<StructuredFormatException>(() =>
             new WritingService(new StructuredService(broken), Options).GradeAsync(Input(), CancellationToken.None));
-        Assert.Equal(new AiUsage(3000, 1500), e.Usage); // both grading attempts + the rewrite are still counted
+        Assert.Equal(new AiUsage(4000, 2000), e.Usage); // both grading attempts + errors + rewrite are still counted
     }
 
     [Fact]
     public async Task A_failed_rewrite_still_returns_the_scores()
     {
-        var provider = new SchemaProvider().On("writing_grade", Grade()).Fail("writing_rewrite", new AiProviderException("Hết thời gian.", 504));
+        var provider = new SchemaProvider().On("writing_grade", Grade()).On("writing_errors", Errors).Fail("writing_rewrite", new AiProviderException("Hết thời gian.", 504));
         var r = await new WritingService(new StructuredService(provider), Options).GradeAsync(Input(), CancellationToken.None);
         Assert.Null((string?)r.Value["rewrite"]);
         Assert.Equal("Hết thời gian.", (string?)r.Value["rewriteError"]);
@@ -144,9 +171,30 @@ public sealed class WritingGradeTests
     }
 
     [Fact]
+    public async Task Slow_mistakes_or_rewrite_are_dropped_at_the_deadline_but_slow_scores_fail()
+    {
+        var slow = new SlowProvider(TimeSpan.FromSeconds(5), "writing_errors", "writing_rewrite")
+            .On("writing_grade", Grade()).On("writing_errors", Errors).On("writing_rewrite", Rewrite);
+        var options = Options with { GradingTimeoutSeconds = 1 };
+        var started = DateTime.UtcNow;
+        var r = await new WritingService(new StructuredService(slow), options).GradeAsync(Input(), CancellationToken.None);
+        Assert.True(DateTime.UtcNow - started < TimeSpan.FromSeconds(4));
+        Assert.Equal(6, (double)r.Value["taskScore"]!);
+        Assert.Empty(r.Value["errors"]!.AsArray());
+        Assert.Contains("quá lâu", (string?)r.Value["errorsError"]);
+        Assert.Contains("quá lâu", (string?)r.Value["rewriteError"]);
+
+        var slowScores = new SlowProvider(TimeSpan.FromSeconds(5), "writing_grade")
+            .On("writing_grade", Grade()).On("writing_errors", Errors).On("writing_rewrite", Rewrite);
+        var e = await Assert.ThrowsAsync<AiProviderException>(() =>
+            new WritingService(new StructuredService(slowScores), options).GradeAsync(Input(), CancellationToken.None));
+        Assert.Equal(504, e.StatusCode);
+    }
+
+    [Fact]
     public async Task Short_essays_get_a_capped_task_fulfilment_score()
     {
-        var provider = new SchemaProvider().On("writing_grade", Grade(tf: 9, org: 7, voc: 7, gra: 7)).On("writing_rewrite", Rewrite);
+        var provider = new SchemaProvider().On("writing_grade", Grade(tf: 9, org: 7, voc: 7, gra: 7)).On("writing_errors", NoErrors).On("writing_rewrite", Rewrite);
         var r = await new WritingService(new StructuredService(provider), Options).GradeAsync(Input(Sentence), CancellationToken.None);
         // 12 words of 250 → cap 0.5
         Assert.True((bool)r.Value["shortPenalty"]!);
@@ -163,7 +211,7 @@ public sealed class WritingGradeTests
         var store = new WritingStore(stores, time);
         var options = Fixtures.Options() with { WritingGradePerDay = 10, WritingGradePerDayAnon = 3 };
         var quota = new WritingQuota(options, new IpRateLimiter(time), store, time);
-        var result = WritingService.BuildResult(JsonNode.Parse(Grade())!, JsonNode.Parse(Rewrite), 2, "B2", 12, "m", time.GetUtcNow());
+        var result = WritingService.BuildResult(JsonNode.Parse(Grade())!, JsonNode.Parse(Errors), JsonNode.Parse(Rewrite), 2, "B2", 12, "m", time.GetUtcNow());
 
         for (var i = 0; i < 10; i++)
         {
@@ -210,7 +258,7 @@ public sealed class WritingResultCleaningTests
           {"quote":"","occurrence":1,"category":"grammar","rule":"article","severity":"minor","correction":"","explanationVi":""},
           {"quote":"c","occurrence":2.7,"category":"nonsense","rule":"article","severity":"minor","correction":"","explanationVi":""}]}
         """)!;
-        var r = WritingService.BuildResult(grade, null, 1, "B1", 130, "m", DateTimeOffset.UnixEpoch);
+        var r = WritingService.BuildResult(grade, grade, null, 1, "B1", 130, "m", DateTimeOffset.UnixEpoch);
         var errors = r["errors"]!.AsArray();
         Assert.Single(errors);
         Assert.Equal("other", (string?)errors[0]!["rule"]);
@@ -220,5 +268,7 @@ public sealed class WritingResultCleaningTests
         Assert.Equal("none", (string?)r["band"]);
         Assert.False((bool)r["shortPenalty"]!);
         Assert.NotNull((string?)r["rewriteError"]);
+        Assert.Null(r["errorsError"]);
+        Assert.NotNull((string?)WritingService.BuildResult(grade, null, null, 1, "B1", 130, "m", DateTimeOffset.UnixEpoch)["errorsError"]);
     }
 }

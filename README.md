@@ -29,7 +29,7 @@ Viết bài có tính giờ, AI chấm theo 4 tiêu chí VSTEP, tô lỗi ngay t
 - **Chế độ**: luyện Task 1 (thư/email, ≥ 120 từ, gợi ý 20 phút) hoặc Task 2 (bài luận, ≥ 250 từ, 40 phút), hoặc **Thi thử** (cả 2 task, chung 60 phút, chuyển qua lại tuỳ ý, hết giờ tự nộp, không dán được văn bản). Bậc mục tiêu B1 / B2 / C1 ảnh hưởng độ khó đề và văn phong bản viết lại.
 - **Đề**: AI ra đề đúng format VSTEP theo chủ đề (hoặc ngẫu nhiên) và dạng bài Task 2; hoặc tự dán đề. Không nhúng sẵn đề thi thật hay đề sách có bản quyền. 30 đề gần nhất được nhớ trên máy và gửi cho AI như danh sách "không lặp lại".
 - **Màn viết**: đề bên trái (thu gọn được), ô văn bản thuần bên phải; tắt spellcheck/autocorrect như thi thật (luyện tập có thể bật lại). Đếm từ realtime, đồng hồ cảnh báo khi còn 5 phút và 1 phút. Nháp tự lưu mỗi 5 giây vào IndexedDB (kèm deadline) và được đề nghị khôi phục khi mở lại.
-- **Chấm**: `POST /api/writing/grade` chạy song song 2 lời gọi structured output (chấm điểm + lỗi, và bản viết lại + cụm từ). Server tính lại điểm task = trung bình 4 tiêu chí (làm tròn 0.5), không tin con số tổng của AI. Bài ngắn hơn mức tối thiểu bị giới hạn điểm Hoàn thành nhiệm vụ theo tỉ lệ độ dài. Thi thử: điểm Writing = (Task 1 + Task 2 × 2) / 3. Điểm chỉ là ước lượng của AI để luyện tập.
+- **Chấm**: `POST /api/writing/grade` chạy song song 3 lời gọi structured output (điểm + nhận xét, danh sách lỗi, bản viết lại + cụm từ) để nằm trong giới hạn khoảng 45 giây của SWA; phần lỗi hoặc bản viết lại chưa xong trước `AI_GRADING_TIMEOUT_SECONDS` thì vẫn trả điểm kèm thông báo. Server tính lại điểm task = trung bình 4 tiêu chí (làm tròn 0.5), không tin con số tổng của AI. Bài ngắn hơn mức tối thiểu bị giới hạn điểm Hoàn thành nhiệm vụ theo tỉ lệ độ dài. Thi thử: điểm Writing = (Task 1 + Task 2 × 2) / 3. Điểm chỉ là ước lượng của AI để luyện tập.
 - **Kết quả**: biểu đồ điểm theo tiêu chí; lỗi được tô theo loại trong bài (màu + kiểu gạch chân + nhãn chữ, có bộ lọc); bấm/rê vào lỗi để xem bản sửa, giải thích và "Hỏi AI về lỗi này". Lỗi không định vị được nằm ở danh sách "lỗi chung". Có tab bản viết lại song song (tô chỗ khác biệt), tab cụm từ hay (thêm vào bộ "VSTEP Writing – <chủ đề>" để học bằng flashcard/battle/Luyện Gõ), nút "Viết lại bài này" và bảng so sánh điểm giữa các lần làm cùng đề.
 - **Lịch sử**: lọc theo task/chủ đề, biểu đồ 4 tiêu chí theo thời gian, thống kê lỗi theo loại và lỗi lặp lại (mạo từ, thì, giới từ…). Đăng nhập thì lưu trong container Cosmos `writings` (mỗi bài một document, một document `index` cho tóm tắt, tổng lỗi và quota); chưa đăng nhập thì lưu IndexedDB.
 
@@ -118,7 +118,8 @@ Mọi key và lựa chọn model nằm trong **Application settings** của Stat
 | `AI_GRADING_PRICE_INPUT_PER_MTOK` / `AI_GRADING_PRICE_OUTPUT_PER_MTOK` | nên có | Đơn giá của model chấm (mặc định lấy đơn giá chính) để log chi phí đúng |
 | `AI_GRADING_EFFORT` | không | Mức suy luận khi chấm; mặc định như `AI_EFFORT` |
 | `AI_GRADING_TEMPERATURE` | không | Chỉ gửi khi đặt. Claude và các model reasoning của OpenAI hiện **từ chối** tham số `temperature`, nên mặc định không gửi; độ ổn định đến từ rubric cố định + effort |
-| `AI_GRADING_MAX_TOKENS` | không | Mỗi lời gọi chấm (2 lời gọi song song), mặc định 6000 |
+| `AI_GRADING_MAX_TOKENS` | không | Mỗi lời gọi chấm (3 lời gọi song song), mặc định 6000 |
+| `AI_GRADING_TIMEOUT_SECONDS` | không | Hạn chót phía server cho một lần chấm, mặc định 38 (SWA cắt request ở khoảng 45 giây) |
 | `RATE_WRITING_GRADE_PER_DAY` / `RATE_WRITING_GRADE_PER_DAY_ANON` | không | Số lần chấm bài mỗi ngày: theo tài khoản (đếm trong Cosmos) / theo IP khi chưa đăng nhập (đếm trong bộ nhớ). Mặc định 10 / 3 |
 
 ### Chọn model

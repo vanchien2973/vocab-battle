@@ -131,8 +131,9 @@ public sealed partial class WritingService(StructuredService structured, AiOptio
     }
 
     /// <summary>
-    /// Grade with two calls in parallel (scores + errors, and rewrite + phrases) so the request stays well
-    /// under the SWA timeout. A failed rewrite still returns the scores.
+    /// Grade with three calls in parallel (scores + comments, the list of mistakes, rewrite + phrases) so the
+    /// request stays under the SWA timeout (about 45 s). The scores are required; mistakes and the rewrite are
+    /// returned when they finish within AI_GRADING_TIMEOUT_SECONDS, otherwise the result says they are missing.
     /// </summary>
     public async Task<AiTaskResult> GradeAsync(CheckedGrade g, CancellationToken ct)
     {
@@ -147,22 +148,42 @@ public sealed partial class WritingService(StructuredService structured, AiOptio
             ["prompt"] = g.PromptText.Replace("\"\"\"", "\""),
             ["essay"] = g.Essay.Replace("\"\"\"", "\""),
         };
-        var gp = AiShared.Prompts.Tasks["writingGrade"];
-        var rp = AiShared.Prompts.Tasks["writingRewrite"];
         StructuredRequest Overrides(StructuredRequest r) =>
             r with { Model = options.EffectiveGradingModel, Effort = options.GradingEffort, Temperature = options.GradingTemperature };
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(options.GradingTimeoutSeconds));
 
-        var gradeTask = Run(gp.System, WritingText.Fill(gp.User, values), "writing-grade", Overrides, ct);
-        var rewriteTask = Run(rp.System, WritingText.Fill(rp.User, values), "writing-rewrite", Overrides, ct);
-        await Task.WhenAll(gradeTask, rewriteTask);
+        Task<(JsonNode? Value, Exception? Error, AiUsage Usage)> Start(string task, string schema)
+        {
+            var p = AiShared.Prompts.Tasks[task];
+            return Run(p.System, WritingText.Fill(p.User, values), schema, Overrides, deadline.Token);
+        }
+        var gradeTask = Start("writingGrade", "writing-grade");
+        var errorsTask = Start("writingErrors", "writing-errors");
+        var rewriteTask = Start("writingRewrite", "writing-rewrite");
+        await Task.WhenAll(gradeTask, errorsTask, rewriteTask);
+        ct.ThrowIfCancellationRequested();
+
         var (grade, gradeError, gradeUsage) = gradeTask.Result;
+        var (errors, errorsError, errorsUsage) = errorsTask.Result;
         var (rewrite, rewriteError, rewriteUsage) = rewriteTask.Result;
-        var usage = gradeUsage + rewriteUsage;
+        var usage = gradeUsage + errorsUsage + rewriteUsage;
         if (gradeError is StructuredFormatException sf) throw new StructuredFormatException(sf.Detail, usage);
+        if (gradeError is OperationCanceledException) throw new AiProviderException("AI chấm quá lâu, thử lại sau ít phút.", 504);
         if (gradeError is not null) throw gradeError;
-        var message = rewriteError is null ? null : rewriteError is AiProviderException or StructuredFormatException ? rewriteError.Message : "Chưa tạo được bản viết lại.";
-        return new AiTaskResult(BuildResult(grade!, rewrite, g.Task, g.Level, g.WordCount, options.EffectiveGradingModel, DateTimeOffset.UtcNow, message), usage);
+        return new AiTaskResult(
+            BuildResult(grade!, errors, rewrite, g.Task, g.Level, g.WordCount, options.EffectiveGradingModel, DateTimeOffset.UtcNow,
+                Message(rewriteError, "Chưa tạo được bản viết lại."), Message(errorsError, "Chưa liệt kê được lỗi chi tiết.")),
+            usage);
     }
+
+    private static string? Message(Exception? e, string fallback) => e switch
+    {
+        null => null,
+        OperationCanceledException => fallback + " (AI trả lời quá lâu – bấm \"Viết lại bài này\" và chấm lại nếu cần.)",
+        AiProviderException or StructuredFormatException => e.Message,
+        _ => fallback,
+    };
 
     private async Task<(JsonNode? Value, Exception? Error, AiUsage Usage)> Run(
         string system, string user, string schema, Func<StructuredRequest, StructuredRequest> overrides, CancellationToken ct)
@@ -176,7 +197,7 @@ public sealed partial class WritingService(StructuredService structured, AiOptio
         {
             return (null, e, e.Usage);
         }
-        catch (AiProviderException e)
+        catch (Exception e) when (e is AiProviderException or OperationCanceledException)
         {
             return (null, e, AiUsage.Zero);
         }
@@ -185,7 +206,8 @@ public sealed partial class WritingService(StructuredService structured, AiOptio
     // ---------- result (mirror buildGradeResult in src/vstep/scoring.ts) ----------
 
     internal static JsonObject BuildResult(
-        JsonNode grade, JsonNode? rewrite, int task, string level, int wordCount, string model, DateTimeOffset now, string? rewriteError = null)
+        JsonNode grade, JsonNode? errors, JsonNode? rewrite, int task, string level, int wordCount, string model, DateTimeOffset now,
+        string? rewriteError = null, string? errorsError = null)
     {
         var minWords = C.Task(task).MinWords;
         var criteria = new JsonObject();
@@ -215,7 +237,7 @@ public sealed partial class WritingService(StructuredService structured, AiOptio
             ["taskScore"] = taskScore,
             ["band"] = WritingScoring.Band(taskScore),
             ["shortPenalty"] = wordCount < minWords,
-            ["errors"] = CleanErrors(grade["errors"]),
+            ["errors"] = CleanErrors(errors?["errors"]),
             ["strengths"] = List(grade["strengths"], C.MaxListItems, 400),
             ["improvements"] = List(grade["improvements"], C.MaxListItems, 400),
             ["rewrite"] = rewriteText.Length > 0 ? rewriteText : null,
@@ -224,6 +246,7 @@ public sealed partial class WritingService(StructuredService structured, AiOptio
             ["gradedAt"] = now.ToString("O"),
         };
         if (rewriteText.Length == 0) result["rewriteError"] = rewriteError ?? "Chưa tạo được bản viết lại.";
+        if (errors is null) result["errorsError"] = errorsError ?? "Chưa liệt kê được lỗi chi tiết.";
         return result;
     }
 

@@ -27,6 +27,8 @@ public sealed record AiOptions
     /// <summary>Only sent when set: Claude and OpenAI reasoning models reject sampling parameters.</summary>
     public double? GradingTemperature { get; init; }
     public int GradingMaxTokens { get; init; } = 6000;
+    /// <summary>Server-side limit for a grading; SWA cuts managed function requests at about 45 s.</summary>
+    public int GradingTimeoutSeconds { get; init; } = 38;
     /// <summary>Prices of the grading model; default to the main model's prices.</summary>
     public decimal? GradingPriceInputPerMTok { get; init; }
     public decimal? GradingPriceOutputPerMTok { get; init; }
@@ -81,6 +83,7 @@ public sealed record AiOptions
             GradingEffort = Str("AI_GRADING_EFFORT"),
             GradingTemperature = double.TryParse(Str("AI_GRADING_TEMPERATURE"), NumberStyles.Float, CultureInfo.InvariantCulture, out var temp) ? temp : null,
             GradingMaxTokens = Int("AI_GRADING_MAX_TOKENS", d.GradingMaxTokens),
+            GradingTimeoutSeconds = Int("AI_GRADING_TIMEOUT_SECONDS", d.GradingTimeoutSeconds),
             GradingPriceInputPerMTok = Str("AI_GRADING_PRICE_INPUT_PER_MTOK") is null ? null : Dec("AI_GRADING_PRICE_INPUT_PER_MTOK", 0),
             GradingPriceOutputPerMTok = Str("AI_GRADING_PRICE_OUTPUT_PER_MTOK") is null ? null : Dec("AI_GRADING_PRICE_OUTPUT_PER_MTOK", 0),
             WritingGradePerDay = Int("RATE_WRITING_GRADE_PER_DAY", d.WritingGradePerDay),

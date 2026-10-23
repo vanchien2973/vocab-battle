@@ -1,3 +1,4 @@
+import errorsSchema from '../../api/AiShared/writing-errors.schema.json';
 import gradeSchema from '../../api/AiShared/writing-grade.schema.json';
 import promptSchema from '../../api/AiShared/writing-prompt.schema.json';
 import rewriteSchema from '../../api/AiShared/writing-rewrite.schema.json';
@@ -107,8 +108,8 @@ export function checkGradeInput(input: GradeInput): GradeInput & { wordCount: nu
   return { ...input, task, level, essay, prompt: { ...input.prompt, task, text: promptText }, wordCount };
 }
 
-/** The two calls of a grading: scores + errors, and the rewrite + useful phrases (run in parallel). */
-export function gradeRequests(input: GradeInput): { grade: StructuredRequest; rewrite: StructuredRequest; wordCount: number } {
+/** The three calls of a grading (run in parallel): scores + comments, the mistakes, the rewrite + useful phrases. */
+export function gradeRequests(input: GradeInput): { grade: StructuredRequest; errors: StructuredRequest; rewrite: StructuredRequest; wordCount: number } {
   const c = checkGradeInput(input);
   const cfg = taskConfig(c.task);
   const values: Record<string, string> = {
@@ -122,9 +123,11 @@ export function gradeRequests(input: GradeInput): { grade: StructuredRequest; re
   };
   const fill = (t: string) => fillTemplate(t, values);
   const g = prompts.tasks.writingGrade;
+  const e = prompts.tasks.writingErrors;
   const r = prompts.tasks.writingRewrite;
   return {
     grade: { system: g.system, user: fill(g.user), schemaName: 'writing-grade', schema: gradeSchema, maxTokens: GRADING_MAX_TOKENS },
+    errors: { system: e.system, user: fill(e.user), schemaName: 'writing-errors', schema: errorsSchema, maxTokens: GRADING_MAX_TOKENS },
     rewrite: { system: r.system, user: fill(r.user), schemaName: 'writing-rewrite', schema: rewriteSchema, maxTokens: GRADING_MAX_TOKENS },
     wordCount: c.wordCount,
   };

@@ -4,7 +4,6 @@
   "required": [
     "criteria",
     "overallScore",
-    "errors",
     "strengths",
     "improvements"
   ],
@@ -128,81 +127,6 @@
     "overallScore": {
       "type": "number",
       "description": "Your estimate of the task score (the app recomputes it)."
-    },
-    "errors": {
-      "type": "array",
-      "description": "Concrete mistakes, most important first, at most 40.",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": [
-          "quote",
-          "occurrence",
-          "category",
-          "rule",
-          "severity",
-          "correction",
-          "explanationVi"
-        ],
-        "properties": {
-          "quote": {
-            "type": "string",
-            "description": "The shortest wrong span, copied character for character from the essay."
-          },
-          "occurrence": {
-            "type": "integer",
-            "description": "Which occurrence of this exact quote in the essay (1 = first)."
-          },
-          "category": {
-            "type": "string",
-            "enum": [
-              "grammar",
-              "vocabulary",
-              "spelling",
-              "punctuation",
-              "coherence",
-              "task",
-              "register"
-            ]
-          },
-          "rule": {
-            "type": "string",
-            "enum": [
-              "verb_tense",
-              "subject_verb",
-              "article",
-              "preposition",
-              "plural",
-              "word_form",
-              "word_order",
-              "sentence_structure",
-              "collocation",
-              "word_choice",
-              "spelling",
-              "punctuation",
-              "linking",
-              "register",
-              "content",
-              "other"
-            ]
-          },
-          "severity": {
-            "type": "string",
-            "enum": [
-              "minor",
-              "major"
-            ]
-          },
-          "correction": {
-            "type": "string",
-            "description": "Corrected replacement for the quote."
-          },
-          "explanationVi": {
-            "type": "string",
-            "description": "Short explanation in Vietnamese."
-          }
-        }
-      }
     },
     "strengths": {
       "type": "array",

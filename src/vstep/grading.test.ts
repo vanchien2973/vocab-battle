@@ -10,7 +10,6 @@ const crit = (score: number) => ({ score, comment: 'Nhận xét', evidence: ['qu
 const rawGrade = (scores: [number, number, number, number], extra: Record<string, unknown> = {}) => ({
   criteria: { taskFulfilment: crit(scores[0]), organization: crit(scores[1]), vocabulary: crit(scores[2]), grammar: crit(scores[3]) },
   overallScore: 10,
-  errors: [],
   strengths: ['a', 'b', 'c', 'd'],
   improvements: [],
   ...extra,
@@ -44,28 +43,32 @@ describe('VSTEP scoring', () => {
 
   it('recomputes the task score, caps short essays and cleans the lists', () => {
     const ctx = { task: 2 as const, level: 'B2' as const, wordCount: 300, model: 'm' };
-    const r = buildGradeResult(rawGrade([7, 6, 6, 5.5]), { rewrite: 'Better essay.', usefulPhrases: [] }, ctx);
+    const r = buildGradeResult(rawGrade([7, 6, 6, 5.5]), { errors: [] }, { rewrite: 'Better essay.', usefulPhrases: [] }, ctx);
+    expect(r.errorsError).toBeUndefined();
     expect(r.taskScore).toBe(6); // 6.125, not the model's 10
     expect(r.band).toBe('B2');
     expect(r.strengths).toHaveLength(3);
     expect(r.shortPenalty).toBe(false);
 
     expect(shortEssayCap(125, 250)).toBe(5);
-    const short = buildGradeResult(rawGrade([9, 7, 7, 7]), null, { ...ctx, wordCount: 125 }, 'timeout');
+    const short = buildGradeResult(rawGrade([9, 7, 7, 7]), null, null, { ...ctx, wordCount: 125 }, { rewriteError: 'timeout' });
+    expect(short.errors).toEqual([]);
+    expect(short.errorsError).toBeTruthy();
     expect(short.shortPenalty).toBe(true);
     expect(short.criteria.taskFulfilment.score).toBe(5);
     expect(short.rewrite).toBeNull();
     expect(short.rewriteError).toBe('timeout');
 
     const weird = buildGradeResult(
-      rawGrade([12, -3, 6.3, Number.NaN], {
+      rawGrade([12, -3, 6.3, Number.NaN]),
+      {
         errors: [
           { quote: 'he go', occurrence: 0, category: 'grammar', rule: 'subject_verb', severity: 'major', correction: 'he goes', explanationVi: 'x' },
           { quote: '', occurrence: 1, category: 'grammar', rule: 'x', severity: 'minor', correction: '', explanationVi: '' },
           { quote: 'foo', occurrence: 2, category: 'nonsense', rule: 'x', severity: 'minor', correction: '', explanationVi: '' },
           { quote: 'bar', occurrence: 2.7, category: 'spelling', rule: 'made_up', severity: 'huge', correction: 'baz', explanationVi: '' },
         ],
-      }),
+      },
       { rewrite: 'x', usefulPhrases: [{ text: 'a b', type: 'collocation', meaningVi: 'ab', example: 'e' }, { text: 'A B', type: 'collocation', meaningVi: 'dup', example: '' }, { text: 'c', type: 'noun', meaningVi: 'bad type', example: '' }] },
       ctx,
     );
@@ -85,7 +88,7 @@ function fakeAi(saved = false) {
   const ai: Pick<AiClient, 'gradeWriting'> = {
     gradeWriting: vi.fn(async (input: GradeInput): Promise<GradeResponse> => {
       calls.push(input);
-      const result = buildGradeResult(rawGrade([6, 6, 6, 6]), { rewrite: 'r', usefulPhrases: [] }, { task: input.task, level: input.level, wordCount: 3, model: 'm' });
+      const result = buildGradeResult(rawGrade([6, 6, 6, 6]), { errors: [] }, { rewrite: 'r', usefulPhrases: [] }, { task: input.task, level: input.level, wordCount: 3, model: 'm' });
       return saved ? { result, saved: { id: `w-${'a'.repeat(31)}${input.task}`, promptId: 'p'.repeat(16), attempt: 4 } } : { result };
     }),
   };

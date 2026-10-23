@@ -69,6 +69,7 @@ export function WritingResult({ session, history = [], onRewrite, actions }: Pro
       )}
       {tab === 'essay' && (
         <section className="card">
+          {record.result.errorsError && <p className="notice small">{record.result.errorsError}</p>}
           <AnnotatedEssay text={record.text} errors={record.result.errors} />
         </section>
       )}

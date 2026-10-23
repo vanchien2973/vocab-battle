@@ -87,13 +87,15 @@ export class DirectAiClient implements AiClient {
     return cleanPrompt(raw, checked);
   }
 
-  /** Grading and rewrite run in parallel; a failed rewrite still returns the scores. */
+  /** Scores, mistakes and rewrite run in parallel; the scores alone are enough for a result. */
   async gradeWriting(input: GradeInput, signal?: AbortSignal): Promise<GradeResponse> {
-    const { grade, rewrite, wordCount } = gradeRequests(input);
-    const parse = (req: StructuredRequest) => (t: string) => parseStructured<Record<string, unknown>>(req.schemaName, req.schema, t);
-    const [g, r] = await Promise.allSettled([this.structured(grade, parse(grade), signal), this.structured(rewrite, parse(rewrite), signal)]);
+    const { grade, errors, rewrite, wordCount } = gradeRequests(input);
+    const run = (req: StructuredRequest) => this.structured(req, (t) => parseStructured<Record<string, unknown>>(req.schemaName, req.schema, t), signal);
+    const [g, e, r] = await Promise.allSettled([run(grade), run(errors), run(rewrite)]);
     if (g.status === 'rejected') throw g.reason;
-    const result = buildGradeResult(g.value, r.status === 'fulfilled' ? r.value : null, { task: input.task, level: input.level, wordCount, model: this.settings.model }, r.status === 'rejected' ? (r.reason as Error).message : undefined);
+    const value = (x: PromiseSettledResult<Record<string, unknown>>) => (x.status === 'fulfilled' ? x.value : null);
+    const reason = (x: PromiseSettledResult<unknown>) => (x.status === 'rejected' ? (x.reason as Error).message : undefined);
+    const result = buildGradeResult(g.value, value(e), value(r), { task: input.task, level: input.level, wordCount, model: this.settings.model }, { rewriteError: reason(r), errorsError: reason(e) });
     return { result };
   }
 

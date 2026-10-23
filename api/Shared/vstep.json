@@ -70,7 +70,7 @@
     { "id": "content", "label": "Nội dung" },
     { "id": "other", "label": "Khác" }
   ],
-  "maxErrors": 40,
+  "maxErrors": 30,
   "maxListItems": 3,
   "maxEvidence": 3,
   "maxPhrases": 12,

@@ -19,7 +19,8 @@ const e = (category: WritingError['category'], rule: string): WritingError => ({
 const crit = (score: number) => ({ score, comment: '', evidence: [] });
 function record(id: string, promptId: string, errors: WritingError[], createdAt = '2026-10-20T00:00:00Z'): Omit<WritingRecord, 'attempt'> {
   const result = buildGradeResult(
-    { criteria: { taskFulfilment: crit(7), organization: crit(6), vocabulary: crit(6.5), grammar: crit(5) }, errors, strengths: [], improvements: [] },
+    { criteria: { taskFulfilment: crit(7), organization: crit(6), vocabulary: crit(6.5), grammar: crit(5) }, strengths: [], improvements: [] },
+    { errors },
     { rewrite: 'r', usefulPhrases: [] },
     { task: 2, level: 'B2', wordCount: 260, model: 'm' },
   );
