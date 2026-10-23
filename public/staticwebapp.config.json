@@ -1,0 +1,19 @@
+{
+  "platform": {
+    "apiRuntime": "dotnet-isolated:10.0"
+  },
+  "routes": [
+    { "route": "/api/lookup", "methods": ["POST"] },
+    { "route": "/api/chat", "methods": ["POST"] },
+    { "route": "/api/usage", "methods": ["GET"] },
+    { "route": "/api/*", "statusCode": 404 }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": ["/assets/*", "/api/*", "/*.{svg,png,ico,json,txt}"]
+  },
+  "globalHeaders": {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin"
+  }
+}
