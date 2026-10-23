@@ -5,6 +5,7 @@ import { gradeDraft, type GradedSession } from '../../vstep/grading';
 import { MODE_LABELS, modeMinutes } from '../../vstep/config';
 import { hasContent, type WritingDraft } from '../../vstep/drafts';
 import { rememberPrompt } from '../../vstep/recentPrompts';
+import type { WritingRecord, WritingSummary } from '../../vstep/types';
 import { promptIdOf } from '../../vstep/wordCount';
 import { WritingEditor } from './WritingEditor';
 import { WritingHome, type StartSession } from './WritingHome';
@@ -14,7 +15,7 @@ type Stage =
   | { name: 'home' }
   | { name: 'write'; draft: WritingDraft }
   | { name: 'grading'; draft: WritingDraft; error?: string }
-  | { name: 'result'; session: GradedSession };
+  | { name: 'result'; session: GradedSession; history?: WritingSummary[] };
 
 export function newDraft(s: StartSession, now = Date.now()): WritingDraft {
   return {
@@ -61,10 +62,24 @@ export function WritingScreen({ onMenu }: { onMenu: () => void }) {
       await data.drafts.clear();
       setPending(null);
       setStage({ name: 'result', session });
+      void loadHistory(session);
     } catch (e) {
       setStage({ name: 'grading', draft, error: (e as Error).message });
     }
   }
+
+  /** Earlier attempts, to compare scores on the result page. */
+  async function loadHistory(session: GradedSession) {
+    try {
+      const { summaries } = await data.writings.history();
+      setStage((s) => (s.name === 'result' && s.session === session ? { ...s, history: summaries } : s));
+    } catch {
+      // the comparison is optional
+    }
+  }
+
+  const rewrite = (r: WritingRecord) =>
+    start({ mode: r.task === 1 ? 'task1' : 'task2', level: r.level, prompts: [r.prompt], texts: [r.text], rewriteOf: r.id });
 
   if (stage.name === 'write') {
     return (
@@ -117,6 +132,8 @@ export function WritingScreen({ onMenu }: { onMenu: () => void }) {
     return (
       <WritingResult
         session={stage.session}
+        history={stage.history}
+        onRewrite={rewrite}
         actions={
           <>
             <button type="button" className="btn primary" onClick={() => setStage({ name: 'home' })}>

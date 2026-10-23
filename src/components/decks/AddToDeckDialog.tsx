@@ -10,14 +10,16 @@ interface Props {
   items: Item[];
   /** Optional root word to add along with a phrase when the deck does not have it yet. */
   root?: Item;
+  /** Pre-filled name for "create a new deck" (e.g. "VSTEP Writing – Môi trường"). */
+  defaultNewName?: string;
   onDone: (message: string) => void;
   onClose: () => void;
 }
 
 /** "Thêm vào bộ từ": pick a deck (or create one) and append the items, skipping duplicates. */
-export function AddToDeckDialog({ items, root, onDone, onClose }: Props) {
+export function AddToDeckDialog({ items, root, defaultNewName = '', onDone, onClose }: Props) {
   const data = useData();
-  const [newName, setNewName] = useState('');
+  const [newName, setNewName] = useState(defaultNewName);
   const [withRoot, setWithRoot] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

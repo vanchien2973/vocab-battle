@@ -37,7 +37,7 @@ export function ScoreHeadline({ records, exam }: { records: WritingRecord[]; exa
 }
 
 /** One task: criterion bars, comments with quoted evidence, strengths and what to improve. */
-export function TaskScores({ record, previous }: { record: WritingRecord; previous?: WritingRecord }) {
+export function TaskScores({ record, previous }: { record: WritingRecord; previous?: Record<Criterion, number> }) {
   const r = record.result;
   return (
     <section className="card">
@@ -48,7 +48,8 @@ export function TaskScores({ record, previous }: { record: WritingRecord; previo
         {r.wordCount} từ (tối thiểu {r.minWords}){r.shortPenalty && ' · bài chưa đủ độ dài nên điểm Hoàn thành nhiệm vụ bị giới hạn'}
         {record.attempt > 1 && ` · lần làm thứ ${record.attempt}`}
       </p>
-      <ScoreBars scores={scoresOf(record)} previous={previous ? scoresOf(previous) : undefined} />
+      {previous && <p className="muted small">Vạch trắng trên mỗi thanh là điểm lần làm trước.</p>}
+      <ScoreBars scores={scoresOf(record)} previous={previous} />
       <div className="criterion-notes">
         {CRITERIA.map((c) => (
           <div key={c}>
