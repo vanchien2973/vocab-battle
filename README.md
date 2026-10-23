@@ -40,7 +40,7 @@ Mọi key và lựa chọn model nằm trong **Application settings** của Stat
 | `AI_DAILY_BUDGET_USD` | không | Ngân sách ước tính mỗi ngày; vượt thì trả 429 |
 | `AI_LOOKUP_MAX_TOKENS` / `AI_CHAT_MAX_TOKENS` | không | Mặc định 1500 / 800 |
 | `AI_EFFORT` | không | Mức suy luận; mặc định `none` (OpenAI), `low` (Anthropic) |
-| `CHAT_STREAMING` | không | `false` để trả lời chat một lần thay vì stream |
+| `CHAT_STREAMING` | không | Mặc định trả lời chat một lần (JSON); `true` để stream SSE (xem bên dưới) |
 | `RATE_LOOKUP_PER_MINUTE` / `RATE_CHAT_PER_MINUTE` / `RATE_PER_IP_PER_DAY` | không | Mặc định 20 / 10 / 300 |
 
 ### Chọn model
@@ -72,7 +72,9 @@ System prompt và schema nằm trong `api/AiShared/`. Server nhúng chúng vào 
 
 ### Streaming trên SWA
 
-Kết quả thử nghiệm trên SWA thật: _(sẽ cập nhật sau lần deploy đầu)_. Nếu managed functions buffer response, client vẫn chạy được: hiển thị "AI đang trả lời…" rồi nhận toàn bộ câu trả lời một lần. Có thể đặt `CHAT_STREAMING=false` để server trả JSON một lần.
+**Kết quả đo ngày 23/10/2026 trên SWA Free (East US 2, .NET 10 isolated + ASP.NET Core integration):** managed functions **buffer toàn bộ response**. Với `CHAT_STREAMING=true`, server ghi SSE và flush từng đoạn, nhưng client vẫn nhận toàn bộ câu trả lời (khoảng 2 KB) trong **một chunk** sau khoảng 3,1 giây; không có chunk nào đến trước.
+
+Vì vậy mặc định chat **trả về một lần** (JSON `{ "reply": … }`), còn UI hiển thị "AI đang trả lời…" trong lúc chờ. Code streaming vẫn được giữ: client đọc được cả SSE lẫn JSON, nên nếu sau này chuyển API sang Function App riêng (không qua proxy của SWA) thì chỉ cần đặt `CHAT_STREAMING=true`. Chế độ BYOK gọi thẳng provider nên vẫn stream thật.
 
 ## BYOK (API key riêng)
 

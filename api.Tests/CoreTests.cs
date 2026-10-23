@@ -257,12 +257,13 @@ public class AiOptionsTests
             ["AI_PROVIDER"] = "Anthropic",
             ["AI_MODEL"] = "claude-haiku-5-5",
             ["AI_PRICE_INPUT_PER_MTOK"] = "0.10",
-            ["CHAT_STREAMING"] = "false",
+            ["CHAT_STREAMING"] = "true",
         };
         var o = AiOptions.From(k => env.GetValueOrDefault(k));
         Assert.Equal("anthropic", o.Provider);
         Assert.Equal(0.10m, o.PriceInputPerMTok);
-        Assert.False(o.ChatStreaming);
+        Assert.True(o.ChatStreaming);
+        Assert.False(AiOptions.From(_ => null).ChatStreaming);
         Assert.Contains("API key", o.ConfigurationError);
 
         env["ANTHROPIC_API_KEY"] = "k";
