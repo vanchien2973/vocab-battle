@@ -1,11 +1,13 @@
+import type { Item } from '../decks/types';
 import rawWords from './words.json';
 
 /** Levels of the built-in word list (and the level filter). */
 export const LEVELS = ['A1', 'A2', 'B1', 'B2'] as const;
 export type Level = (typeof LEVELS)[number];
-/** Saved dictionary words can also be C1/C2. */
+/** Items from decks or the dictionary can also be C1/C2. */
 export type WordLevel = Level | 'C1' | 'C2';
 
+/** A row of words.json. */
 export interface Word {
   id: string;
   word: string;
@@ -14,27 +16,40 @@ export interface Word {
   level: WordLevel;
 }
 
+/**
+ * What a battle asks about: a deck item (word or phrase) plus where it came from. Built-in words
+ * have a level and no deckId; items from "Bộ của tôi" carry their deck so results can update FSRS.
+ */
+export type BattleItem = Item & {
+  level?: WordLevel;
+  deckId?: string;
+  /** The item's id in its deck when the battle id had to be made unique (same item in two decks). */
+  sourceId?: string;
+};
+
 export const ALL_WORDS: readonly Word[] = rawWords as Word[];
 
-const byId = new Map(ALL_WORDS.map((w) => [w.id, w]));
+export function itemFromWord(w: Word): BattleItem {
+  return { id: w.id, type: 'word', text: w.word, meaning: w.meaning, examples: w.example ? [{ en: w.example, vi: '' }] : [], tags: [], level: w.level };
+}
 
-export function getWord(id: string): Word | undefined {
+/** The built-in words as battle items (also the distractor pool for small decks). */
+export const BUILTIN_ITEMS: readonly BattleItem[] = ALL_WORDS.map(itemFromWord);
+
+const byId = new Map(BUILTIN_ITEMS.map((w) => [w.id, w]));
+
+export function getBuiltin(id: string): BattleItem | undefined {
   return byId.get(id);
 }
 
-/** Resolve built-in ids to words, silently dropping ids that no longer exist. */
-export function wordsFromIds(ids: readonly string[]): Word[] {
-  return ids.map((id) => byId.get(id)).filter((w): w is Word => w !== undefined);
+/** Resolve built-in ids, silently dropping ids that no longer exist. */
+export function builtinFromIds(ids: readonly string[]): BattleItem[] {
+  return ids.map((id) => byId.get(id)).filter((w): w is BattleItem => w !== undefined);
 }
 
-/** `mine` keeps only the player's saved words (ids starting with "my:"). */
-export type WordFilter = Level | 'all' | 'mine';
-
-export function filterWords(words: readonly Word[], level: WordFilter, search: string): Word[] {
+export function filterItems(items: readonly BattleItem[], level: Level | 'all', search: string): BattleItem[] {
   const q = search.trim().toLowerCase();
-  return words.filter(
-    (w) =>
-      (level === 'all' || (level === 'mine' ? w.id.startsWith('my:') : w.level === level)) &&
-      (q === '' || w.word.toLowerCase().includes(q) || w.meaning.toLowerCase().includes(q)),
+  return items.filter(
+    (w) => (level === 'all' || w.level === level) && (q === '' || w.text.toLowerCase().includes(q) || w.meaning.toLowerCase().includes(q)),
   );
 }

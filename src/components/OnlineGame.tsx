@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { resolveWords } from '../data/catalog';
 import { useOnlineSession } from '../hooks/useOnlineSession';
 import { GuestSession } from '../net/guest';
 import { HostSession } from '../net/host';
@@ -7,11 +6,13 @@ import { hostRoom, joinRoom } from '../net/peerTransport';
 import { generateRoomCode, normalizeRoomCode, roomLink } from '../net/roomCode';
 import type { OnlineSession, OnlineSnapshot } from '../net/session';
 import type { ConnectionStatus } from '../net/transport';
-import { loadName, loadSelection, saveName, saveSelection } from '../storage/selection';
+import { loadName, loadSelection, savePracticeWords, saveName, saveSelection } from '../storage/selection';
+import { useData } from '../decks/DataContext';
+import { newDeck } from '../decks/types';
 import { PlayerView } from './battle/PlayerView';
-import { useDelayedFlag } from './OfflineGame';
+import { useBattleProgress, useDelayedFlag } from './OfflineGame';
 import { CountdownOverlay } from './prepare/CountdownOverlay';
-import { WordPicker } from './prepare/WordPicker';
+import { ItemPicker } from './prepare/ItemPicker';
 import { WordPreview } from './prepare/WordPreview';
 import { ResultScreen } from './ResultScreen';
 
@@ -154,6 +155,8 @@ function OnlineRoom({
   const snap = useOnlineSession(session)!;
   const isHost = session instanceof HostSession;
   const showResult = useDelayedFlag(snap.phase === 'over', 1200);
+  // Only the host's items carry deck ids, so only the host's FSRS progress changes.
+  useBattleProgress(snap.phase === 'over' && session.role === 'host' ? snap.game : null, session.me, snap.words);
 
   // Opponent left → notify, then return to the menu.
   useEffect(() => {
@@ -195,6 +198,7 @@ function OnlineRoom({
           state={snap.game}
           me={me}
           onAnswer={(q, i, ms) => session.submitAnswer(q, i, ms)}
+          onSkip={isHost ? () => session.skipReveal() : undefined}
         />
         <div className="conn-float">
           <ConnectionBadge status={snap.status} />
@@ -216,7 +220,10 @@ function OnlineRoom({
             </button>
           </>
         ) : (
-          <span className="muted">Chờ chủ phòng chọn chơi lại…</span>
+          <>
+            <SaveDeckButton items={snap.words} hostName={snap.hostName} />
+            <span className="muted">Chờ chủ phòng chọn chơi lại…</span>
+          </>
         )}
         <button type="button" className="btn ghost" onClick={onMenu}>
           Rời phòng
@@ -277,21 +284,41 @@ function OnlineRoom({
 }
 
 function HostPicker({ session, onLeave }: { session: HostSession; onLeave: () => void }) {
-  const [ids, setIds] = useState<string[]>(() =>
-    session.snapshot.words.length ? session.snapshot.words.map((w) => w.id) : loadSelection(),
-  );
+  const [selection, setSelection] = useState(loadSelection);
   return (
-    <WordPicker
-      selected={ids}
-      onChange={setIds}
+    <ItemPicker
+      selection={selection}
+      onChange={setSelection}
       onBack={onLeave}
       title={`Bạn chọn bộ từ cho cả hai. ${session.snapshot.guestName ?? 'Đối thủ'} sẽ xem nhưng không sửa được.`}
-      onNext={() => {
-        saveSelection(ids);
-        // Send full word content: the guest may not have the host's saved "Của tôi" words.
-        session.setWordSet(resolveWords(ids));
+      onNext={(items, kinds) => {
+        saveSelection(selection);
+        savePracticeWords(items);
+        // Full item content goes to the guest: they do not have the host's decks.
+        session.setWordSet(items, kinds);
       }}
     />
+  );
+}
+
+/** Guest after a match: keep the host's items as a new deck. */
+function SaveDeckButton({ items, hostName }: { items: OnlineSnapshot['words']; hostName: string }) {
+  const data = useData();
+  const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const save = async () => {
+    setState('saving');
+    try {
+      const clean = items.map(({ level, deckId, sourceId, ...it }) => (void level, void deckId, void sourceId, it));
+      await data.importDeck(newDeck(`Trận với ${hostName || 'chủ phòng'}`, { items: clean }));
+      setState('saved');
+    } catch {
+      setState('error');
+    }
+  };
+  return (
+    <button type="button" className="btn" disabled={state === 'saving' || state === 'saved'} onClick={() => void save()}>
+      {state === 'saved' ? '✓ Đã lưu bộ' : state === 'error' ? 'Lỗi – thử lại' : '💾 Lưu bộ này'}
+    </button>
   );
 }
 

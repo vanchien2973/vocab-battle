@@ -12,17 +12,28 @@ export interface PlayerState {
   maxCombo: number;
   correct: number;
   damageDealt: number;
-  /** Word ids this player answered wrong (or ran out of time on), in order, unique. */
-  wrongWordIds: string[];
+  /** Item ids this player answered wrong (or ran out of time on), in order, unique. */
+  wrongItemIds: string[];
+  /** Item ids this player answered right at least once, in order, unique. */
+  rightItemIds: string[];
 }
+
+export const QUESTION_KINDS = ['meaning', 'cloze', 'collocation', 'particle', 'errorSpot', 'idiomContext'] as const;
+export type QuestionKind = (typeof QUESTION_KINDS)[number];
 
 export interface Question {
   id: string;
-  wordId: string;
-  word: string;
+  itemId: string;
+  kind: QuestionKind;
+  /** Main text: the word/phrase, a sentence with a blank, a Vietnamese situation… */
+  prompt: string;
+  /** What to do, e.g. "Chọn nghĩa đúng". */
+  instruction: string;
   options: string[];
   /** -1 when hidden (e.g. sent to an online guest before the round resolves). */
   correctIndex: number;
+  /** Short explanation shown after the round (hidden from the guest while the question is open). */
+  explanation: string;
 }
 
 /** A player's submission; answerIndex null means time ran out. */

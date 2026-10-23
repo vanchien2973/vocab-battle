@@ -4,10 +4,13 @@ import type { GameState, Question } from './types';
 
 const q = (n: number): Question => ({
   id: `q${n}`,
-  wordId: `w${n}`,
-  word: `word${n}`,
+  itemId: `w${n}`,
+  kind: 'meaning',
+  prompt: `word${n}`,
+  instruction: '',
   options: ['a', 'b', 'c', 'd'],
   correctIndex: 0,
+  explanation: '',
 });
 
 const fresh = () => startRound(initGame({ p1: 'An', p2: 'Bình' }), q(1));
@@ -39,7 +42,7 @@ describe('engine', () => {
     s = play(s, 2, 0, 1);
     expect(s.players.p1.combo).toBe(2);
     expect(s.players.p2.combo).toBe(0);
-    expect(s.players.p2.wrongWordIds).toEqual(['w1', 'w2']);
+    expect(s.players.p2.wrongItemIds).toEqual(['w1', 'w2']);
     s = play(s, 3, 1, 0);
     expect(s.players.p1.combo).toBe(0);
     expect(s.players.p1.maxCombo).toBe(2);
@@ -58,8 +61,8 @@ describe('engine', () => {
   it('treats timeouts and late answers as wrong', () => {
     const s = resolveRound(fresh(), { p1: { answerIndex: 0, ms: 11_000 } });
     expect(s.lastResult!.attacker).toBeNull();
-    expect(s.players.p1.wrongWordIds).toEqual(['w1']);
-    expect(s.players.p2.wrongWordIds).toEqual(['w1']);
+    expect(s.players.p1.wrongItemIds).toEqual(['w1']);
+    expect(s.players.p2.wrongItemIds).toEqual(['w1']);
   });
 
   it('ends the game when HP reaches 0', () => {

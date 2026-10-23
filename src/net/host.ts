@@ -1,8 +1,8 @@
-import { ALL_WORDS, type Word } from '../data/words';
+import { BUILTIN_ITEMS, type BattleItem } from '../data/words';
 import { Match, type MatchOptions } from '../game/match';
-import { MIN_SELECTED_WORDS } from '../game/questions';
-import type { GameState } from '../game/types';
-import { MAX_WORDSET, type Message } from './protocol';
+import { battlePool, DEFAULT_KINDS, minSelected } from '../game/questions';
+import type { GameState, QuestionKind } from '../game/types';
+import { isKinds, itemsForPeer, MAX_ITEMSET_CHARS, MAX_WORDSET, type Message } from './protocol';
 import { COUNTDOWN_SECONDS, SessionBase, cleanName, type OnlineSession } from './session';
 import type { GameTransport } from './transport';
 
@@ -10,15 +10,15 @@ import type { GameTransport } from './transport';
 export const ONLINE_GRACE_MS = 2000;
 
 export interface HostOptions {
-  pool?: readonly Word[];
+  pool?: readonly BattleItem[];
   countdownSeconds?: number;
   match?: Partial<Pick<MatchOptions, 'rng' | 'roundTimeMs' | 'graceMs' | 'revealMs'>>;
 }
 
-/** Hide the correct answer while a question is still open so the guest cannot peek. */
+/** Hide the correct answer (and its explanation) while a question is still open so the guest cannot peek. */
 export function sanitizeForGuest(state: GameState): GameState {
   if (state.phase !== 'question' || !state.question) return state;
-  return { ...state, question: { ...state.question, correctIndex: -1 } };
+  return { ...state, question: { ...state.question, correctIndex: -1, explanation: '' } };
 }
 
 /**
@@ -69,14 +69,17 @@ export class HostSession extends SessionBase implements OnlineSession {
     this.transport.send({ type: 'selecting' });
   }
 
-  /** Confirm the word set chosen in step 1 and move both sides to the preview. */
-  setWordSet(words: readonly Word[]): boolean {
+  /** Confirm the items and question kinds chosen in step 1 and move both sides to the preview. */
+  setWordSet(words: readonly BattleItem[], kinds: readonly QuestionKind[] = DEFAULT_KINDS): boolean {
     const valid = [...new Map(words.map((w) => [w.id, w])).values()];
-    if (valid.length < MIN_SELECTED_WORDS || valid.length > MAX_WORDSET || this.snapshot.guestName === null) return false;
+    if (valid.length < minSelected(valid) || valid.length > MAX_WORDSET || this.snapshot.guestName === null) return false;
+    if (!isKinds([...kinds])) return false;
     if (this.snapshot.phase === 'countdown' || this.snapshot.phase === 'playing') return false;
+    const message: Message = { type: 'itemset', items: itemsForPeer(valid), kinds: [...kinds] };
+    if (JSON.stringify(message).length > MAX_ITEMSET_CHARS) return false;
     this.stopMatch();
-    this.update({ phase: 'preview', words: valid, game: null });
-    this.transport.send({ type: 'wordset', words: valid });
+    this.update({ phase: 'preview', words: valid, kinds: [...kinds], game: null });
+    this.transport.send(message);
     this.setReadiness({ host: false, guest: false });
     return true;
   }
@@ -90,9 +93,13 @@ export class HostSession extends SessionBase implements OnlineSession {
     this.match?.submit('p1', questionId, answerIndex, ms);
   }
 
-  /** After a match: back to the preview with the same word set. */
+  /** After a match: back to the preview with the same items. */
   rematch(): void {
-    if (this.snapshot.phase === 'over') this.setWordSet(this.snapshot.words);
+    if (this.snapshot.phase === 'over') this.setWordSet(this.snapshot.words, this.snapshot.kinds);
+  }
+
+  skipReveal(): void {
+    this.match?.skipReveal();
   }
 
   private setReadiness(ready: { host: boolean; guest: boolean }): void {
@@ -109,8 +116,8 @@ export class HostSession extends SessionBase implements OnlineSession {
     const match = new Match({
       names: { p1: this.snapshot.hostName, p2: this.snapshot.guestName ?? 'Khách' },
       selected: this.snapshot.words,
-      // Saved words join the distractor pool so their meanings show up as options too.
-      pool: [...(this.opts.pool ?? ALL_WORDS), ...this.snapshot.words.filter((w) => w.id.startsWith('my:'))],
+      kinds: this.snapshot.kinds,
+      pool: battlePool(this.opts.pool ?? BUILTIN_ITEMS, this.snapshot.words),
       graceMs: ONLINE_GRACE_MS,
       ...this.opts.match,
     });

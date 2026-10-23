@@ -12,10 +12,12 @@ interface Props {
   /** Keyboard keys for options 1–4 (desktop). */
   keys?: string[];
   opponentLabel?: string;
+  /** Ends the explanation after a round early (omitted where the player cannot pace the match). */
+  onSkip?: () => void;
 }
 
 /** One player's side of the battle: opponent HP, the question, own HP. */
-export function PlayerView({ state, me, onAnswer, keys = ['1', '2', '3', '4'], opponentLabel }: Props) {
+export function PlayerView({ state, me, onAnswer, keys = ['1', '2', '3', '4'], opponentLabel, onSkip }: Props) {
   useCompactHeader();
   const q = state.question;
   const [picked, setPicked] = useState<{ qid: string; index: number } | null>(null);
@@ -64,7 +66,8 @@ export function PlayerView({ state, me, onAnswer, keys = ['1', '2', '3', '4'], o
         {q && (
           <>
             <div className="round-info muted">Câu {state.round}</div>
-            <h2 className="q-word">{q.word}</h2>
+            <div className="q-instruction muted small">{q.instruction}</div>
+            <h2 className={`q-word kind-${q.kind}`}>{q.prompt}</h2>
             {state.phase === 'question' && <div key={q.id} className="timer" style={{ animationDuration: `${ROUND_TIME_MS}ms` }} />}
             <div className="options">
               {q.options.map((opt, i) => {
@@ -84,6 +87,16 @@ export function PlayerView({ state, me, onAnswer, keys = ['1', '2', '3', '4'], o
             <div className={`feedback ${feedback?.tone ?? ''}`} aria-live="polite">
               {feedback?.text ?? (myPick !== null ? 'Đã chọn, chờ đối thủ…' : timeUp ? '⏰ Hết giờ' : ' ')}
             </div>
+            {result && q.explanation && (
+              <div className="explanation">
+                <span>💡 {q.explanation}</span>
+                {onSkip && state.phase === 'reveal' && (
+                  <button type="button" className="btn small ghost" onClick={onSkip}>
+                    Bỏ qua ⏭
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
       </div>

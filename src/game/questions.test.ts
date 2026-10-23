@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_WORDS } from '../data/words';
+import { BUILTIN_ITEMS as ALL_WORDS } from '../data/words';
 import { createDeck, drawQuestion, makeQuestion } from './questions';
 import { mulberry32 } from './rng';
 
@@ -32,22 +32,22 @@ describe('makeQuestion', () => {
 
 describe('drawQuestion', () => {
   it('only asks words from the selected set', () => {
-    for (const q of drawMany(35)) expect(selectedIds.has(q.wordId)).toBe(true);
+    for (const q of drawMany(35)) expect(selectedIds.has(q.itemId)).toBe(true);
   });
 
   it('does not repeat a word until every selected word was asked', () => {
     const qs = drawMany(10);
-    expect(new Set(qs.map((q) => q.wordId)).size).toBe(10);
+    expect(new Set(qs.map((q) => q.itemId)).size).toBe(10);
   });
 
   it('reshuffles when the deck runs out and keeps going', () => {
     const qs = drawMany(30);
     expect(qs).toHaveLength(30);
     for (const round of [qs.slice(10, 20), qs.slice(20, 30)]) {
-      expect(new Set(round.map((q) => q.wordId)).size).toBe(10);
+      expect(new Set(round.map((q) => q.itemId)).size).toBe(10);
     }
     // never the same word twice in a row across a reshuffle
-    for (let i = 1; i < qs.length; i++) expect(qs[i].wordId).not.toBe(qs[i - 1].wordId);
+    for (let i = 1; i < qs.length; i++) expect(qs[i].itemId).not.toBe(qs[i - 1].itemId);
   });
 
   it('can draw distractors from outside the selected set', () => {

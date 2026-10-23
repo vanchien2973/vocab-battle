@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
-import type { Word } from '../../data/words';
+import type { BattleItem } from '../../data/words';
+import { ITEM_TYPE_LABELS } from '../../decks/types';
 import { WordLink } from '../ai/AppHeader';
 import { SpeakButton } from './SpeakButton';
 
 interface Props {
-  words: Word[];
+  words: BattleItem[];
   /** Back to step 1; omitted for the online guest, who cannot edit the set. */
   onBack?: () => void;
   note?: ReactNode;
@@ -59,18 +60,22 @@ export function WordPreview({ words, onBack, note, children }: Props) {
             }}
           >
             <div className="face front">
-              <span className={`badge lv-${word.level}`}>{word.level}</span>
-              <h2>{word.word}</h2>
+              <ItemBadge item={word} />
+              <h2>{word.text}</h2>
               <span className="card-tools">
-                <SpeakButton text={word.word} />
-                <WordLink word={word.word}>📖</WordLink>
+                <SpeakButton text={word.text} />
+                <WordLink word={word.text}>📖</WordLink>
               </span>
               <span className="hint">Chạm để lật</span>
             </div>
             <div className="face back">
               <h3>{word.meaning}</h3>
-              <p className="example">“{word.example}”</p>
-              <SpeakButton text={word.example} />
+              {word.examples[0] && (
+                <>
+                  <p className="example">“{word.examples[0].en}”</p>
+                  <SpeakButton text={word.examples[0].en} />
+                </>
+              )}
             </div>
           </div>
           <div className="flash-nav">
@@ -92,14 +97,14 @@ export function WordPreview({ words, onBack, note, children }: Props) {
           {words.map((w) => (
             <li key={w.id}>
               <div>
-                <WordLink word={w.word}>
-                  <strong>{w.word}</strong>
+                <WordLink word={w.text}>
+                  <strong>{w.text}</strong>
                 </WordLink>{' '}
-                <span className={`badge lv-${w.level}`}>{w.level}</span>
+                <ItemBadge item={w} />
                 <div>{w.meaning}</div>
-                <div className="example muted">{w.example}</div>
+                {w.examples[0] && <div className="example muted">{w.examples[0].en}</div>}
               </div>
-              <SpeakButton text={w.word} />
+              <SpeakButton text={w.text} />
             </li>
           ))}
         </ul>
@@ -115,4 +120,10 @@ export function WordPreview({ words, onBack, note, children }: Props) {
       </footer>
     </div>
   );
+}
+
+/** Level for built-in words, item type for phrases from decks. */
+export function ItemBadge({ item }: { item: BattleItem }) {
+  if (item.type !== 'word' || !item.level) return <span className={`badge type-${item.type}`}>{ITEM_TYPE_LABELS[item.type]}</span>;
+  return <span className={`badge lv-${item.level}`}>{item.level}</span>;
 }

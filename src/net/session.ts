@@ -1,5 +1,5 @@
-import type { Word } from '../data/words';
-import type { GameState, PlayerId } from '../game/types';
+import type { BattleItem } from '../data/words';
+import { QUESTION_KINDS, type GameState, type PlayerId, type QuestionKind } from '../game/types';
 import type { ConnectionStatus, GameTransport } from './transport';
 
 export const COUNTDOWN_SECONDS = 3;
@@ -17,7 +17,8 @@ export interface OnlineSnapshot {
   phase: OnlinePhase;
   hostName: string;
   guestName: string | null;
-  words: Word[];
+  words: BattleItem[];
+  kinds: QuestionKind[];
   ready: { host: boolean; guest: boolean };
   countdown: number | null;
   game: GameState | null;
@@ -32,6 +33,8 @@ export interface OnlineSession {
   subscribe(cb: (s: OnlineSnapshot) => void): () => void;
   setReady(ready: boolean): void;
   submitAnswer(questionId: string, answerIndex: number | null, ms: number): void;
+  /** Host only: end the explanation after a round early. */
+  skipReveal(): void;
   leave(): void;
 }
 
@@ -55,6 +58,7 @@ export abstract class SessionBase {
       hostName,
       guestName: null,
       words: [],
+      kinds: [...QUESTION_KINDS],
       ready: { host: false, guest: false },
       countdown: null,
       game: null,

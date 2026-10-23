@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALL_WORDS, LEVELS, filterWords, wordsFromIds } from './words';
+import { ALL_WORDS, BUILTIN_ITEMS, LEVELS, builtinFromIds, filterItems } from './words';
 
 describe('words.json', () => {
   it('has unique ids and meanings', () => {
@@ -20,14 +20,18 @@ describe('words.json', () => {
   });
 });
 
-describe('filterWords / wordsFromIds', () => {
-  it('filters by level and search on word or meaning', () => {
-    expect(filterWords(ALL_WORDS, 'A1', 'táo').map((w) => w.id)).toEqual(['apple']);
-    expect(filterWords(ALL_WORDS, 'B2', 'apple')).toEqual([]);
-    expect(filterWords(ALL_WORDS, 'all', '').length).toBe(ALL_WORDS.length);
+describe('built-in items', () => {
+  it('are "word" items with the example as examples[0]', () => {
+    expect(BUILTIN_ITEMS[0]).toMatchObject({ id: 'apple', type: 'word', text: 'apple', meaning: 'quả táo', level: 'A1', examples: [{ en: ALL_WORDS[0].example, vi: '' }] });
+  });
+
+  it('filters by level and search on text or meaning', () => {
+    expect(filterItems(BUILTIN_ITEMS, 'A1', 'táo').map((w) => w.id)).toEqual(['apple']);
+    expect(filterItems(BUILTIN_ITEMS, 'B2', 'apple')).toEqual([]);
+    expect(filterItems(BUILTIN_ITEMS, 'all', '').length).toBe(ALL_WORDS.length);
   });
 
   it('drops unknown ids', () => {
-    expect(wordsFromIds(['apple', 'nope']).map((w) => w.id)).toEqual(['apple']);
+    expect(builtinFromIds(['apple', 'nope']).map((w) => w.id)).toEqual(['apple']);
   });
 });

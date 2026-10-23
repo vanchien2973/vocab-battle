@@ -30,11 +30,12 @@ export class GuestSession extends SessionBase implements OnlineSession {
         this.stopCountdown();
         this.update({ phase: 'selecting', ready: { host: false, guest: false }, game: null });
         return;
-      case 'wordset':
+      case 'itemset':
         this.stopCountdown();
         this.update({
           phase: 'preview',
-          words: msg.words,
+          words: msg.items,
+          kinds: msg.kinds,
           ready: { host: false, guest: false },
           game: null,
         });
@@ -66,5 +67,9 @@ export class GuestSession extends SessionBase implements OnlineSession {
 
   submitAnswer(questionId: string, answerIndex: number | null, ms: number): void {
     this.transport.send({ type: 'answer', questionId, answerIndex, ms });
+  }
+
+  skipReveal(): void {
+    // The host paces the match.
   }
 }

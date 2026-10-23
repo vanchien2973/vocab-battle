@@ -2,8 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getAiClient } from '../../ai';
 import { MAX_USER_CHARS, loadChat, saveChat, type SavedChat } from '../../ai/chatHistory';
 import { AiError, CEFR_LEVELS, type ChatMode, type ChatMsg } from '../../ai/types';
-import { resolveWords } from '../../data/catalog';
-import { loadSelection } from '../../storage/selection';
+import { loadPracticeWords } from '../../storage/selection';
 import { useAiUi } from './AiContext';
 import { Markdown } from './Markdown';
 import { Sheet } from './Sheet';
@@ -52,7 +51,7 @@ export function ChatPanel() {
     try {
       const words =
         base.mode === 'practice'
-          ? resolveWords(loadSelection()).map((w) => ({ word: w.word, meaning: w.meaning }))
+          ? loadPracticeWords()
           : undefined;
       const onDelta = (d: string) => {
         streamed += d;
@@ -85,7 +84,7 @@ export function ChatPanel() {
   if (!open) return null;
 
   const mode = MODES.find((m) => m.id === chat.mode)!;
-  const practiceCount = chat.mode === 'practice' ? resolveWords(loadSelection()).length : 0;
+  const practiceCount = chat.mode === 'practice' ? loadPracticeWords().length : 0;
 
   return (
     <Sheet

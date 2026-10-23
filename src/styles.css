@@ -1361,3 +1361,26 @@ a.btn { text-decoration: none; text-align: center; }
   .progress-bar > span,
   .study-progress > span { transition: none; }
 }
+
+/* battle question kinds */
+.q-instruction { text-align: center; margin-bottom: 0.2rem; }
+.q-word.kind-cloze,
+.q-word.kind-particle,
+.q-word.kind-idiomContext { font-size: clamp(1.05rem, 4.2vw, 1.4rem); font-weight: 600; line-height: 1.35; }
+.explanation {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  font-size: 0.85rem;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 0.3rem;
+}
+.split .explanation { font-size: 0.75rem; }
+.option { overflow-wrap: anywhere; }
+.explanation .btn { white-space: nowrap; flex: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+details.kinds { margin-top: 0.5rem; }
+details.kinds summary { cursor: pointer; color: var(--muted); }
+details.kinds .chips { margin-top: 0.4rem; }

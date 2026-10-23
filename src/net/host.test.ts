@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALL_WORDS } from '../data/words';
+import { BUILTIN_ITEMS as ALL_WORDS, type BattleItem } from '../data/words';
 import { mulberry32 } from '../game/rng';
 import { GuestSession } from './guest';
 import { HostSession, ONLINE_GRACE_MS, sanitizeForGuest } from './host';
@@ -63,12 +63,25 @@ describe('online host/guest', () => {
       expect(ids(guest.snapshot.words)).toEqual(TEN);
     });
 
-    it('sends word content so saved words unknown to the guest still work', () => {
+    it('sends item content and question kinds, without the host deck ids', () => {
       const { host, guest } = setup();
-      const mine = { id: 'my:resilient', word: 'resilient', meaning: 'kiên cường', example: 'She is resilient.', level: 'C1' as const };
+      const mine: BattleItem = {
+        id: 'i1',
+        type: 'phrasal_verb',
+        text: 'look into',
+        meaning: 'điều tra',
+        examples: [{ en: 'They looked into it.', vi: 'Họ đã điều tra.' }],
+        tags: [],
+        distractors: { wrongCollocations: [], wrongParticles: ['at', 'after'], wrongSentences: [] },
+        deckId: 'host-deck',
+      };
       host.beginSelecting();
-      expect(host.setWordSet([mine, ...TEN_WORDS.slice(0, 9)])).toBe(true);
-      expect(guest.snapshot.words[0]).toEqual(mine);
+      expect(host.setWordSet([mine, ...TEN_WORDS.slice(0, 9)], ['particle', 'meaning'])).toBe(true);
+      const { deckId, ...expected } = mine;
+      void deckId;
+      expect(guest.snapshot.words[0]).toEqual(expected);
+      expect(guest.snapshot.kinds).toEqual(['particle', 'meaning']);
+      expect(host.snapshot.words[0].deckId).toBe('host-deck');
       host.setReady(true);
       guest.setReady(true);
       vi.advanceTimersByTime(3000);
@@ -106,7 +119,7 @@ describe('online host/guest', () => {
       expect(host.snapshot.phase).toBe('playing');
       expect(guest.snapshot.phase).toBe('playing');
       expect(guest.snapshot.game!.round).toBe(1);
-      expect(TEN).toContain(guest.snapshot.game!.question!.wordId);
+      expect(TEN).toContain(guest.snapshot.game!.question!.itemId);
     });
 
     it('going back to word selection resets readiness', () => {
@@ -177,7 +190,7 @@ describe('online host/guest', () => {
       }
       expect(guest.snapshot.phase).toBe('over');
       expect(guest.snapshot.game!.winner).toBe('p1');
-      expect(guest.snapshot.game!.players.p2.wrongWordIds.length).toBeGreaterThan(0);
+      expect(guest.snapshot.game!.players.p2.wrongItemIds.length).toBeGreaterThan(0);
       host.rematch();
       expect(guest.snapshot.phase).toBe('preview');
       expect(ids(guest.snapshot.words)).toEqual(TEN);
@@ -204,12 +217,20 @@ describe('protocol', () => {
   it('validates incoming messages', () => {
     expect(isMessage({ type: 'answer', questionId: 'q', answerIndex: 1, ms: 10 })).toBe(true);
     expect(isMessage({ type: 'answer', questionId: 'q', answerIndex: '1', ms: 10 })).toBe(false);
-    const w = { id: 'my:x', word: 'x', meaning: 'y', example: '', level: 'B1' };
-    expect(isMessage({ type: 'wordset', words: [w] })).toBe(true);
-    expect(isMessage({ type: 'wordset', words: [{ ...w, level: 'Z9' }] })).toBe(false);
-    expect(isMessage({ type: 'wordset', words: [{ ...w, meaning: 'x'.repeat(301) }] })).toBe(false);
-    expect(isMessage({ type: 'wordset', words: Array(301).fill(w) })).toBe(false);
-    expect(isMessage({ type: 'wordset', wordIds: ['a'] })).toBe(false);
+    const w = { id: 'x', type: 'idiom', text: 'break the ice', meaning: 'phá băng', examples: [{ en: 'a', vi: 'b' }], tags: [] };
+    const ok = (items: unknown[], kinds: unknown = ['meaning']) => isMessage({ type: 'itemset', items, kinds });
+    expect(ok([w])).toBe(true);
+    expect(ok([{ ...w, level: 'B1', distractors: { wrongCollocations: [], wrongParticles: [], wrongSentences: ['x'] } }])).toBe(true);
+    expect(ok([{ ...w, level: 'Z9' }])).toBe(false);
+    expect(ok([{ ...w, type: 'verb' }])).toBe(false);
+    expect(ok([{ ...w, meaning: 'x'.repeat(201) }])).toBe(false);
+    expect(ok([{ ...w, examples: Array(6).fill({ en: 'a', vi: '' }) }])).toBe(false);
+    expect(ok([{ ...w, distractors: { wrongCollocations: Array(7).fill('x'), wrongParticles: [], wrongSentences: [] } }])).toBe(false);
+    expect(ok([{ ...w, deckId: 'someone-elses' }])).toBe(false);
+    expect(ok(Array(301).fill(w))).toBe(false);
+    expect(ok([w], [])).toBe(false);
+    expect(ok([w], ['hack'])).toBe(false);
+    expect(isMessage({ type: 'wordset', words: [] })).toBe(false);
     expect(isMessage({ type: 'nope' })).toBe(false);
     expect(isMessage(null)).toBe(false);
   });
@@ -219,7 +240,7 @@ describe('protocol', () => {
       players: {} as never,
       round: 1,
       phase: 'reveal' as const,
-      question: { id: 'q', wordId: 'w', word: 'w', options: [], correctIndex: 2 },
+      question: { id: 'q', itemId: 'w', kind: 'meaning' as const, prompt: 'w', instruction: '', options: [], correctIndex: 2, explanation: 'x' },
       lastResult: null,
       winner: null,
     };

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import type { Word } from '../data/words';
+import type { BattleItem } from '../data/words';
+import { ITEM_TYPE_LABELS } from '../decks/types';
 import { matchScore } from '../game/engine';
 import type { GameState, PlayerId } from '../game/types';
 import { recordMatch, type ScoreMode } from '../storage/highScore';
@@ -12,8 +13,8 @@ interface Props {
   mode: ScoreMode;
   /** Players on this device: their scores are saved and their wrong words listed. */
   viewers: PlayerId[];
-  /** Words of this match, used to show the wrong ones (online they come from the host). */
-  words: readonly Word[];
+  /** Items of this match, used to show the wrong ones (online they come from the host). */
+  words: readonly BattleItem[];
   children: ReactNode;
 }
 
@@ -31,10 +32,10 @@ function record(state: GameState, mode: ScoreMode, viewers: PlayerId[]) {
   return r;
 }
 
-/** Pre-filled chat message asking the tutor about the words a player got wrong. */
-export function wrongWordsPrompt(words: readonly Word[]): string {
-  const list = words.map((w) => `- ${w.word} (${w.meaning})`).join('\n');
-  return `Mình vừa trả lời sai các từ sau trong trận đấu:\n${list}\nHãy giải thích ngắn gọn từng từ, cho ví dụ và mẹo ghi nhớ giúp mình.`;
+/** Pre-filled chat message asking the tutor about the words and phrases a player got wrong. */
+export function wrongWordsPrompt(words: readonly BattleItem[]): string {
+  const list = words.map((w) => `- ${w.text}${w.type === 'word' ? '' : ` [${ITEM_TYPE_LABELS[w.type]}]`} (${w.meaning})`).join('\n');
+  return `Mình vừa trả lời sai các từ/cụm từ sau trong trận đấu:\n${list}\nHãy giải thích ngắn gọn từng mục (cụm từ thì giải thích cả cụm), cho ví dụ và mẹo ghi nhớ giúp mình.`;
 }
 
 export function ResultScreen({ state, mode, viewers, words: matchWords, children }: Props) {
@@ -78,10 +79,10 @@ export function ResultScreen({ state, mode, viewers, words: matchWords, children
       <div className="actions">{children}</div>
 
       {viewers.map((id) => {
-        const words = state.players[id].wrongWordIds.map((wid) => byId.get(wid)).filter((w): w is Word => !!w);
+        const words = state.players[id].wrongItemIds.map((wid) => byId.get(wid)).filter((w): w is BattleItem => !!w);
         return (
           <section key={id} className="review">
-            <h2>{viewers.length > 1 ? `Ôn lại – ${state.players[id].name}` : 'Từ cần ôn lại'}</h2>
+            <h2>{viewers.length > 1 ? `Ôn lại – ${state.players[id].name}` : 'Từ & cụm từ cần ôn lại'}</h2>
             {words.length > 0 && (
               <button type="button" className="btn primary small ask-ai" onClick={() => openChat({ mode: 'explain', message: wrongWordsPrompt(words) })}>
                 🧑‍🏫 Hỏi AI về các từ {viewers.length > 1 ? `${state.players[id].name} làm sai` : 'tôi làm sai'}
@@ -94,13 +95,13 @@ export function ResultScreen({ state, mode, viewers, words: matchWords, children
                 {words.map((w) => (
                   <li key={w.id}>
                     <div>
-                      <WordLink word={w.word}>
-                        <strong>{w.word}</strong>
+                      <WordLink word={w.text}>
+                        <strong>{w.text}</strong>
                       </WordLink>{' '}
                       – {w.meaning}
-                      <div className="example muted">{w.example}</div>
+                      {w.examples[0] && <div className="example muted">{w.examples[0].en}</div>}
                     </div>
-                    <SpeakButton text={w.word} />
+                    <SpeakButton text={w.text} />
                   </li>
                 ))}
               </ul>

@@ -15,7 +15,7 @@ export const MAX_HP = 100;
 export const ROUND_TIME_MS = 10_000;
 
 function newPlayer(name: string): PlayerState {
-  return { name, hp: MAX_HP, combo: 0, maxCombo: 0, correct: 0, damageDealt: 0, wrongWordIds: [] };
+  return { name, hp: MAX_HP, combo: 0, maxCombo: 0, correct: 0, damageDealt: 0, wrongItemIds: [], rightItemIds: [] };
 }
 
 export function initGame(names: Record<PlayerId, string>): GameState {
@@ -44,7 +44,7 @@ function normalize(answer: Answer | undefined, roundTimeMs: number): Answer | nu
 /**
  * Resolve the current round. Every correct answer extends that player's combo; only the
  * fastest correct player (by their own measured ms) deals damage. Wrong or missing
- * answers reset the combo and record the word for review.
+ * answers reset the combo and record the item for review.
  */
 export function resolveRound(
   state: GameState,
@@ -63,10 +63,11 @@ export function resolveRound(
     const p = players[id];
     if (correct) {
       const combo = p.combo + 1;
-      players[id] = { ...p, combo, maxCombo: Math.max(p.maxCombo, combo), correct: p.correct + 1 };
+      const rightItemIds = p.rightItemIds.includes(q.itemId) ? p.rightItemIds : [...p.rightItemIds, q.itemId];
+      players[id] = { ...p, combo, maxCombo: Math.max(p.maxCombo, combo), correct: p.correct + 1, rightItemIds };
     } else {
-      const wrongWordIds = p.wrongWordIds.includes(q.wordId) ? p.wrongWordIds : [...p.wrongWordIds, q.wordId];
-      players[id] = { ...p, combo: 0, wrongWordIds };
+      const wrongItemIds = p.wrongItemIds.includes(q.itemId) ? p.wrongItemIds : [...p.wrongItemIds, q.itemId];
+      players[id] = { ...p, combo: 0, wrongItemIds };
     }
   }
 

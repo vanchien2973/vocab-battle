@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { catalogWords, resolveWords } from '../data/catalog';
-import { ALL_WORDS, filterWords } from '../data/words';
+import { itemFromEntry } from '../decks/itemTools';
 import { MAX_MESSAGES, MAX_TOTAL_CHARS, contextNote, prepareChat, trimHistory } from './chatHistory';
 import { MAX_CACHED, cacheLookup, getCachedLookup } from './lookupCache';
-import { addMyWord, hasMyWord, loadMyWords, removeMyWord, wordFromEntry } from './myWords';
 import { normalizeWord, parseLookup, prompts } from './shared';
 import type { ChatMsg, LookupEntry } from './types';
 
@@ -98,38 +96,12 @@ describe('lookup cache', () => {
   });
 });
 
-describe('my words', () => {
-  it('turns an entry into a playable word', () => {
-    expect(wordFromEntry(entry('Resilient'))).toEqual({
-      id: 'my:resilient',
-      word: 'Resilient',
-      meaning: 'kiên cường; đàn hồi',
-      example: 'She is resilient.',
-      level: 'C1',
-    });
-    expect(wordFromEntry(entry('???'))).toBeNull();
-  });
-
-  it('adds without duplicates, removes, and joins the catalog', () => {
-    addMyWord(entry('resilient'));
-    addMyWord(entry('resilient', { cefr: 'B2' }));
-    addMyWord(entry('thrive'));
-    expect(loadMyWords().map((w) => w.id)).toEqual(['my:resilient', 'my:thrive']);
-    expect(loadMyWords()[0].level).toBe('B2');
-    expect(hasMyWord('Resilient')).toBe(true);
-
-    const catalog = catalogWords();
-    expect(catalog).toHaveLength(ALL_WORDS.length + 2);
-    expect(filterWords(catalog, 'mine', '').map((w) => w.id)).toEqual(['my:resilient', 'my:thrive']);
-    expect(resolveWords(['apple', 'my:thrive', 'gone']).map((w) => w.id)).toEqual(['apple', 'my:thrive']);
-
-    removeMyWord('my:resilient');
-    expect(hasMyWord('resilient')).toBe(false);
-  });
-
-  it('ignores corrupted storage', () => {
-    localStorage.setItem('vocab-battle.mywords.v1', JSON.stringify([{ id: 'apple' }, 'x', null]));
-    expect(loadMyWords()).toEqual([]);
+describe('dictionary entry → deck item', () => {
+  it('keeps the type the lookup detected, two meanings and examples', () => {
+    const it = itemFromEntry(entry('look into', { itemType: 'phrasal_verb' }), 'root');
+    expect(it).toMatchObject({ type: 'phrasal_verb', text: 'look into', meaning: 'kiên cường; đàn hồi', relatedTo: 'root' });
+    expect(it.ipa).toBeUndefined();
+    expect(itemFromEntry(entry('resilient')).ipa).toBe('/x/');
   });
 });
 

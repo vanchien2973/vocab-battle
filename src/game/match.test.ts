@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ALL_WORDS } from '../data/words';
+import { BUILTIN_ITEMS as ALL_WORDS } from '../data/words';
 import { Match } from './match';
 import { mulberry32 } from './rng';
 

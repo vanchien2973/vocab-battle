@@ -1,17 +1,20 @@
-import type { Word } from '../data/words';
+import type { BattleItem } from '../data/words';
 import { ROUND_TIME_MS, initGame, resolveRound, startRound } from './engine';
-import { createDeck, drawQuestion, type Deck } from './questions';
+import { createDeck, DEFAULT_KINDS, drawQuestion, type Deck } from './questions';
 import { defaultRng, type Rng } from './rng';
-import { PLAYER_IDS, type Answer, type GameState, type PlayerId } from './types';
+import { PLAYER_IDS, type Answer, type GameState, type PlayerId, type QuestionKind } from './types';
 
-export const REVEAL_MS = 1800;
+/** The answer and a short explanation stay up this long (players can skip). */
+export const REVEAL_MS = 2200;
 
 export interface MatchOptions {
   names: Record<PlayerId, string>;
-  /** Words the questions are drawn from. */
-  selected: readonly Word[];
-  /** Words distractors are drawn from (usually all words). */
-  pool: readonly Word[];
+  /** Items the questions are drawn from. */
+  selected: readonly BattleItem[];
+  /** Items wrong options are drawn from (selected items plus built-in words). */
+  pool: readonly BattleItem[];
+  /** Question kinds to use (default: all). */
+  kinds?: readonly QuestionKind[];
   rng?: Rng;
   roundTimeMs?: number;
   /** Extra wait after the round time before forcing resolution (network latency). */
@@ -67,6 +70,11 @@ export class Match implements MatchLike {
     this.listeners.clear();
   }
 
+  /** End the explanation early and go to the next question. */
+  skipReveal(): void {
+    if (this.state.phase === 'reveal') this.nextRound();
+  }
+
   /** Returns false when the answer is stale, duplicated or arrives outside a question phase. */
   submit(playerId: PlayerId, questionId: string, answerIndex: number | null, ms: number): boolean {
     const q = this.state.question;
@@ -77,7 +85,7 @@ export class Match implements MatchLike {
   }
 
   private nextRound(): void {
-    const { question, deck } = drawQuestion(this.deck, this.opts.selected, this.opts.pool, this.rng, ++this.seq);
+    const { question, deck } = drawQuestion(this.deck, this.opts.selected, this.opts.pool, this.rng, ++this.seq, this.opts.kinds ?? DEFAULT_KINDS);
     this.deck = deck;
     this.answers = {};
     this.setState(startRound(this.state, question));
